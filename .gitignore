@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+
+# Node
+node_modules/
+
+# Project folders
+evaluate/
+
+# Data (IMPORTANT for your case)
+data/
+datasets/
+*.csv
+*.mp4
+*.zip
+*.h5
+*.pt
+
+# System
+.DS_Store
