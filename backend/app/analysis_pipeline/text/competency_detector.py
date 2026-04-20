@@ -106,14 +106,18 @@ def _build_target_definitions(target_skills: list[str], bank: dict[str, str]) ->
 
 def _allowed_additional_keys(bank: dict[str, str], exclude: set[str]) -> str:
     keys = sorted(k for k in bank if k not in exclude)
-    return ", ".join(keys[:40])   # cap to keep prompt manageable
+    return ", ".join(keys[:15])   # cap at 15 — a long list inflates the prompt without improving recall
 
 
 # ── Per-pair worker ────────────────────────────────────────────────────────────
 
 def _detect_one(pair: QAPair, bank: dict[str, str]) -> list[DetectedSkill]:
     answer = (pair.answer or "").strip()
-    if not answer or len(answer.split()) < settings.text_min_answer_words:
+    if (
+        not answer
+        or answer == settings.segment_no_answer_placeholder
+        or len(answer.split()) < settings.text_min_answer_words
+    ):
         return []
 
     target_skills = [_normalize(s) for s in (pair.target_skills or []) if s]
@@ -140,7 +144,8 @@ def _detect_one(pair: QAPair, bank: dict[str, str]) -> list[DetectedSkill]:
 
     detected: list[DetectedSkill] = []
 
-    # Target competencies (include not_demonstrated for gap reporting)
+    # Target competencies — skip not_demonstrated (no evidence = no entry in the report;
+    # absence is already implied by not appearing in the detected list).
     for item in result.get("target_skills", []):
         if not isinstance(item, dict):
             continue
@@ -148,7 +153,9 @@ def _detect_one(pair: QAPair, bank: dict[str, str]) -> list[DetectedSkill]:
         strength = str(item.get("strength", "")).strip().lower()
         if name not in bank:
             continue
-        if strength not in {"strong", "moderate", "weak", "not_demonstrated"}:
+        if strength == "not_demonstrated":
+            continue
+        if strength not in {"strong", "moderate", "weak"}:
             strength = "weak"
         detected.append(DetectedSkill(
             name=       name,

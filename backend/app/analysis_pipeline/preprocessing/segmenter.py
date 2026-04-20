@@ -1,9 +1,12 @@
 import json
+import logging
 import re
 
 from app.config import settings
 from app.services.mistral_client import generate
 from app.schemas.analysis import QAPair, QuestionInput
+
+logger = logging.getLogger(__name__)
 
 
 _SEGMENT_PROMPT = """You are given a job interview transcript and a numbered list of questions that were asked.
@@ -72,6 +75,7 @@ def segment_transcript(
         print(f"[Segment] Using timestamped segments: {len(transcript_segments)} segments")
     else:
         transcript_text = full_transcript
+        print(f"[Segment] WARNING: No timestamped segments available — using plain text (boundary detection degraded)")
 
     fitted_transcript = _fit_transcript_window(transcript_text)
     print(f"[Segment] Fitted transcript length: {len(fitted_transcript)} chars (max: {settings.segment_max_transcript_chars})")
@@ -253,12 +257,11 @@ def _assign_by_index(items: list[dict], question_count: int) -> list[dict]:
                     assigned[i] = overflow.pop(0)
 
     if overflow:
+        # Only fill overflow into empty slots — never append to a populated slot,
+        # as that would merge two different answers into the last question.
         extra = "\n\n".join(item["answer"] for item in overflow if item.get("answer", "").strip()).strip()
-        if extra:
-            if assigned[-1] is None or not assigned[-1].get("answer", "").strip():
-                assigned[-1] = {"answer": extra, "start_sec": None, "end_sec": None}
-            else:
-                assigned[-1]["answer"] = f"{assigned[-1]['answer']}\n\n{extra}".strip()
+        if extra and (assigned[-1] is None or not assigned[-1].get("answer", "").strip()):
+            assigned[-1] = {"answer": extra, "start_sec": None, "end_sec": None}
 
     output = []
     for i in range(question_count):
@@ -279,6 +282,13 @@ def _fallback_split(transcript: str, n: int) -> list[dict]:
         return []
 
     text = (transcript or "").strip()
+    if text:
+        logger.warning(
+            "[Segment] FALLBACK: splitting %d chars of transcript into %d chunks by "
+            "character count — answer-to-question mapping will likely be wrong. "
+            "This only happens when the LLM failed all %d attempts.",
+            len(text), n, settings.segment_llm_attempts,
+        )
     if not text:
         return [
             {

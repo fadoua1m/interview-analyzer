@@ -120,12 +120,14 @@ class RelevanceScore:
         directness_score: float | None = None,
         depth_score:      float | None = None,
         rubric_fit_score: float | None = None,
+        skipped:          bool  = False,
     ):
         self.score            = round(max(0.0, min(10.0, float(score))), 1)
         self.reasoning        = str(reasoning).strip()[:300]
         self.directness_score = round(max(0.0, min(10.0, float(directness_score))), 1) if directness_score is not None else None
         self.depth_score      = round(max(0.0, min(10.0, float(depth_score))), 1)      if depth_score      is not None else None
         self.rubric_fit_score = round(max(0.0, min(10.0, float(rubric_fit_score))), 1) if rubric_fit_score is not None else None
+        self.skipped          = skipped  # True when answer was absent/placeholder
 
 
 # ── Per-pair worker ────────────────────────────────────────────────────────────
@@ -147,9 +149,9 @@ def _score_one(pair: QAPair) -> RelevanceScore:
     if not _is_usable(answer):
         if answer == settings.segment_no_answer_placeholder:
             print(f"[Relevance] SKIPPED: No answer was extracted from the transcript.")
-            return RelevanceScore(score=0.0, reasoning="No answer was extracted from the transcript.")
+            return RelevanceScore(score=0.0, reasoning="No answer was extracted from the transcript.", skipped=True)
         print(f"[Relevance] SKIPPED: answer too short ({answer_words} words, min: {settings.text_min_answer_words})")
-        return RelevanceScore(score=0.0, reasoning="Answer too short for reliable scoring.")
+        return RelevanceScore(score=0.0, reasoning="Answer too short for reliable scoring.", skipped=True)
 
     rubric = (pair.rubric or "").strip()
     print(f"[Relevance] ✓ Calling LLM for evaluation...")
@@ -219,7 +221,8 @@ def run(qa_pairs: list[QAPair]) -> dict:
                 print(f"[Relevance] Q{idx+1} failed: {e}")
                 results[idx] = RelevanceScore()
 
-    filled = [r if r is not None else RelevanceScore() for r in results]
-    overall = round(sum(r.score for r in filled) / len(filled), 2) if filled else 0.0
+    filled  = [r if r is not None else RelevanceScore() for r in results]
+    scored  = [r for r in filled if not r.skipped]
+    overall = round(sum(r.score for r in scored) / len(scored), 2) if scored else 0.0
 
     return {"per_question": filled, "overall_score": overall}

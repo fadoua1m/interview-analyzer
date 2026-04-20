@@ -321,16 +321,35 @@ REJECT  : relevance <4, clarity <4 OR engagement <30% OR critical red flags (e.g
         except (ValueError, TypeError):
             overall_score = 50
 
-        # Hard overrides
+        # Hard overrides — when we change the decision, patch hr_summary too so
+        # the report is self-consistent (LLM may have written "advance" when we REJECT).
         if relevance_score < 4.0:
             decision = "REJECT"
             decision_reasons = ["Relevance score critically low."] + decision_reasons[:2]
+            hr_summary = (
+                f"Candidate's answers showed critically low relevance ({relevance_score:.1f}/10), "
+                f"below the minimum threshold for progression. "
+                f"Text clarity was {clarity_score:.1f}/10. "
+                f"Recommendation: do not advance to the next stage."
+            )
         elif face_detect_rate > 0 and engagement_rate < 30:
             decision = "REJECT"
             decision_reasons = ["Insufficient engagement detected in video."] + decision_reasons[:2]
+            hr_summary = (
+                f"Video analysis detected a face in only {face_detect_rate:.0f}% of frames, "
+                f"with an engagement proxy of {engagement_rate:.0f}% — below the 30% threshold. "
+                f"Text scores: relevance {relevance_score:.1f}/10, clarity {clarity_score:.1f}/10. "
+                f"Recommendation: do not advance without further verification."
+            )
         elif relevance_score < 5.5 or clarity_score < 5.5:
             if decision == "PROCEED":
                 decision = "REVIEW"
+                hr_summary = (
+                    f"Candidate showed borderline text quality (relevance {relevance_score:.1f}/10, "
+                    f"clarity {clarity_score:.1f}/10) — below the threshold for automatic progression. "
+                    f"Engagement proxy: {engagement_rate:.0f}%; dominant emotion: {dominant_emotion}. "
+                    f"Recommendation: manual HR review before advancing."
+                )
             decision_reasons = ["Borderline text quality signals."] + decision_reasons[:2]
 
         while len(decision_reasons) < 3:
@@ -377,7 +396,13 @@ def assemble(
 
     text_metrics                      = _extract_text_metrics(text_result)
     emotion_metrics, engagement_metrics = _extract_video_metrics(video_result)
-    detected_skills: list[DetectedSkill] = text_result.competencies if text_result else []
+
+    # Exclude not_demonstrated — competency_detector already drops them, but
+    # guard here in case older data paths or tests still produce them.
+    detected_skills: list[DetectedSkill] = [
+        s for s in (text_result.competencies if text_result else [])
+        if s.strength != "not_demonstrated"
+    ]
 
 
     decision, reasons, summary, overall_score = _llm_decision(

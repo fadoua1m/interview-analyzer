@@ -11,7 +11,7 @@ Orchestrates:
 
 from app.schemas.analysis import QAPair
 from app.analysis_pipeline.text.clarity_analyzer    import run as analyze_clarity,    ClarityAnalysis
-from app.analysis_pipeline.text.relevance_scorer     import run as score_relevance,    RelevanceScore
+from app.analysis_pipeline.text.relevance_scorer     import run as score_relevance
 from app.analysis_pipeline.text.competency_detector  import run as detect_competencies
 
 
@@ -67,14 +67,16 @@ class TextAnalysisResult:
         self.overall_relevance  = self._calc_relevance_score()
 
     def _calc_clarity_score(self) -> float:
-        if not self.clarity_results:
+        scored = [r for r in self.clarity_results if not r.skipped]
+        if not scored:
             return 0.0
-        return round(sum(r.clarity_score for r in self.clarity_results) / len(self.clarity_results), 2)
+        return round(sum(r.clarity_score for r in scored) / len(scored), 2)
 
     def _calc_confidence_level(self) -> str:
-        if not self.clarity_results:
+        scored = [r for r in self.clarity_results if not r.skipped]
+        if not scored:
             return "unknown"
-        levels     = [r.confidence_level for r in self.clarity_results]
+        levels     = [r.confidence_level for r in scored]
         high_count = levels.count("high")
         med_count  = levels.count("medium")
         n          = len(levels)

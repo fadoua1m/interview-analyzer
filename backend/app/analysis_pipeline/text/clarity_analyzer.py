@@ -90,11 +90,13 @@ class ClarityAnalysis:
         confidence_level:   str   = "medium",
         star_coverage:      str   = "partial",
         brief_justification:str   = "",
+        skipped:            bool  = False,
     ):
         self.clarity_score       = round(max(0.0, min(10.0, float(clarity_score))), 2)
         self.confidence_level    = confidence_level    if confidence_level    in self.VALID_CONFIDENCE else "medium"
         self.star_coverage       = star_coverage       if star_coverage       in self.VALID_STAR       else "partial"
         self.brief_justification = str(brief_justification).strip()[:200]
+        self.skipped             = skipped  # True when answer was absent/placeholder
 
 
 # ── Per-pair worker ────────────────────────────────────────────────────────────
@@ -114,6 +116,7 @@ def _analyze_one(pair: QAPair) -> ClarityAnalysis:
             confidence_level="low",
             star_coverage="missing",
             brief_justification=reason,
+            skipped=True,
         )
 
     print(f"[Clarity] ✓ Calling LLM for evaluation...")

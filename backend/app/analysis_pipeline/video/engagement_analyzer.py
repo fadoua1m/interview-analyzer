@@ -22,6 +22,8 @@ NOT used (no data source): yaw, pitch, gaze direction.
 
 import numpy as np
 
+from app.config import settings
+
 
 class EngagementMetrics:
     """Engagement analysis result (0-100 scale for all numeric fields)."""
@@ -93,9 +95,11 @@ def _avg_detection_confidence(frame_records: list[dict]) -> float:
 
 
 def _focus_quality(engagement_rate: float) -> str:
-    if engagement_rate >= 70:
+    high_thr = getattr(settings, "engagement_focus_high_threshold",   70.0)
+    med_thr  = getattr(settings, "engagement_focus_medium_threshold", 42.0)
+    if engagement_rate >= high_thr:
         return "high"
-    elif engagement_rate >= 42:
+    elif engagement_rate >= med_thr:
         return "medium"
     return "low"
 
@@ -120,13 +124,11 @@ def analyze_engagement(frame_records: list[dict]) -> EngagementMetrics:
     pnr  = _positive_neutral_ratio(frame_records)
     adc  = _avg_detection_confidence(frame_records)
 
-    # Weighted composite
-    # face presence is the most load-bearing signal (can't assess without a face)
     engagement = (
-        fdr  * 0.40 +
-        stab * 0.30 +
-        pnr  * 0.20 +
-        adc  * 0.10
+        fdr  * getattr(settings, "engagement_weight_face_detection",    0.40) +
+        stab * getattr(settings, "engagement_weight_emotion_stability",  0.30) +
+        pnr  * getattr(settings, "engagement_weight_positive_neutral",   0.20) +
+        adc  * getattr(settings, "engagement_weight_avg_confidence",     0.10)
     )
 
     return EngagementMetrics(

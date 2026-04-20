@@ -45,8 +45,8 @@ class EmotionMetrics:
         self.emotion_timeline     = emotion_timeline or []
         self.emotion_transitions  = emotion_transitions
         self.transition_rate      = round(transition_rate, 2)
-        # Store confidence as 0-100 (constructor receives 0-1 value and scales it)
-        self.emotion_confidence   = round(max(0.0, min(100.0, emotion_confidence * 100)), 2)
+        # emotion_confidence is already on 0-100 scale — caller is responsible for scaling.
+        self.emotion_confidence   = round(max(0.0, min(100.0, emotion_confidence)), 2)
         self.volatility_score     = round(max(0.0, min(100.0, volatility_score)), 2)
         self.positive_ratio       = round(max(0.0, min(100.0, positive_ratio)), 2)
 
@@ -206,6 +206,6 @@ def analyze_emotions(
         emotion_transitions=  transitions,
         transition_rate=      trans_rate,
         volatility_score=     volatility,
-        emotion_confidence=   avg_conf,   # will be ×100 in constructor
+        emotion_confidence=   avg_conf * 100.0,  # _calculate_avg_confidence returns 0-1
         positive_ratio=       positive_pct,
     )

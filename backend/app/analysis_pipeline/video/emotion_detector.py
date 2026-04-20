@@ -42,6 +42,7 @@ Models
   Classes         : angry, disgust, fear, happy, neutral, sad, surprise
 """
 
+import logging
 import torch
 import numpy as np
 from PIL import Image
@@ -54,12 +55,13 @@ from transformers import (
     AutoConfig,
 )
 
+from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 EMOTION_CLASSES = ["angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"]
-
-_MODEL_ID = "trpakov/vit-face-expression"
 
 # MTCNN parameters from the article (tuned for interview-distance faces)
 _MTCNN_MIN_FACE = 40          # lowered from 200: interview faces can be small
@@ -86,14 +88,15 @@ def _load_models(device: str = "cpu"):
         device=device,
     )
 
-    extractor = AutoFeatureExtractor.from_pretrained(_MODEL_ID)
+    model_id  = getattr(settings, "video_emotion_model_id", "trpakov/vit-face-expression")
+    extractor = AutoFeatureExtractor.from_pretrained(model_id)
 
-    model = AutoModelForImageClassification.from_pretrained(_MODEL_ID)
+    model = AutoModelForImageClassification.from_pretrained(model_id)
     model = model.to(device)
     model.eval()
 
     # Cache the id→label mapping too (avoids repeated config loads)
-    id2label = AutoConfig.from_pretrained(_MODEL_ID).id2label
+    id2label = AutoConfig.from_pretrained(model_id).id2label
 
     return mtcnn, extractor, model, id2label
 
@@ -311,8 +314,16 @@ def detect_video_emotions(
         results.extend(chunk_results)
 
     detected = sum(1 for r in results if r.face_detected)
-    print(
-        f"[EmotionDetector] {len(results)} frames analyzed, "
-        f"{detected} faces detected ({detected/max(len(results),1)*100:.0f}%)"
+    total    = len(results)
+    logger.info(
+        "[EmotionDetector] %d frames analyzed, %d faces detected (%.0f%%)",
+        total, detected, detected / max(total, 1) * 100,
     )
+    if total > 0 and detected == 0:
+        logger.warning(
+            "[EmotionDetector] WARNING: face detected in 0/%d frames — "
+            "check video quality, lighting, or camera angle. "
+            "All engagement/emotion metrics will be at baseline.",
+            total,
+        )
     return results

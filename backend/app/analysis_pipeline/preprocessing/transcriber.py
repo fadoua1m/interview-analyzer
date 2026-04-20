@@ -40,7 +40,8 @@ def clean_transcript(raw: str) -> str:
     text = _remove_timestamps(raw)
     text = _extract_candidate_speech(text)
     text = _remove_fillers(text)
-    text = _remove_repetitions(text)
+    # _remove_repetitions intentionally omitted: the regex matched meaningful
+    # repeated content (e.g. restated examples) and corrupted answers.
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
@@ -57,6 +58,7 @@ def transcribe(video_path: str) -> dict:
                 "file": (Path(audio_path).name, f),
                 "model": settings.whisper_model,
                 "response_format": "verbose_json",
+                "timestamp_granularities": ["segment"],
                 "temperature": 0.0,
             }
             if language_value:
