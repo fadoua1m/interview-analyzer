@@ -56,6 +56,27 @@ def get_competency_bank_for_language(language: str | None = None) -> dict[str, s
     return {k: v for k, v in bank.items() if k and v}
 
 
+def get_display_name_map(language: str | None = None) -> dict[str, str]:
+    """Return a {normalized_key: display_name} map for active soft skills.
+
+    Falls back to English when the requested language has no rows.
+    """
+    normalized_language = _normalize_language(language)
+    rows = list_softskills(language=normalized_language, active=True)
+    if not rows and normalized_language != "en":
+        rows = list_softskills(language="en", active=True)
+
+    display_map: dict[str, str] = {}
+    for row in rows:
+        key = _normalize_key(row.get("key", ""))
+        if not key:
+            continue
+        display_name = (row.get("display_name") or "").strip()
+        display_map[key] = display_name or key.replace("_", " ").title()
+
+    return display_map
+
+
 def validate_softskill_keys(keys: list[str]) -> tuple[list[str], list[str]]:
     normalized_input = []
     seen = set()

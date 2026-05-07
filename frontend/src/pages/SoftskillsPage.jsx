@@ -28,7 +28,7 @@ function SkillRow({ item }) {
     try {
       await updateSkill.mutateAsync({ softskillId: item.id, payload: form });
       setEditing(false);
-      toast.success("Soft skill updated");
+      toast.success(t("softSkillUpdated"));
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Failed to update soft skill");
     }
@@ -37,7 +37,7 @@ function SkillRow({ item }) {
   const remove = async () => {
     try {
       await deleteSkill.mutateAsync(item.id);
-      toast.success("Soft skill deleted");
+      toast.success(t("softSkillDeleted"));
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Failed to delete soft skill");
     }
@@ -51,8 +51,8 @@ function SkillRow({ item }) {
           <Input value={form.display_name} onChange={(e) => setForm((p) => ({ ...p, display_name: e.target.value }))} placeholder="Display name" className="h-8 text-xs" />
           <select value={form.language} onChange={(e) => setForm((p) => ({ ...p, language: e.target.value }))}
             className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300">
-            <option value="en">English</option>
-            <option value="fr">Français</option>
+            <option value="en">{t("langEnglish")}</option>
+            <option value="fr">{t("langFrench")}</option>
           </select>
         </div>
         <Textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} rows={2} className="text-xs resize-none" />
@@ -144,14 +144,14 @@ export default function SoftskillsPage() {
 
   const create = async () => {
     if (!createForm.key.trim() || !createForm.display_name.trim()) {
-      toast.error("Key and display name are required.");
+      toast.error(t("keyAndNameRequired"));
       return;
     }
     try {
       await createSkill.mutateAsync(createForm);
       setCreateForm({ key: "", language, display_name: "", description: "", active: true });
       setShowCreate(false);
-      toast.success("Soft skill created");
+      toast.success(t("softSkillCreated"));
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Failed to create soft skill");
     }
@@ -197,11 +197,11 @@ export default function SoftskillsPage() {
                 placeholder="e.g. Team Collaboration" className="h-9 text-sm" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">Language</label>
+              <label className="text-xs font-medium text-slate-600">{t("languageLabel")}</label>
               <select value={createForm.language} onChange={(e) => setCreateForm((p) => ({ ...p, language: e.target.value }))}
                 className="w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                <option value="en">English</option>
-                <option value="fr">Français</option>
+                <option value="en">{t("langEnglish")}</option>
+                <option value="fr">{t("langFrench")}</option>
               </select>
             </div>
           </div>
@@ -219,7 +219,7 @@ export default function SoftskillsPage() {
             </label>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowCreate(false)} className="h-8 px-4 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors">
-                Cancel
+                {t("cancel")}
               </button>
               <button onClick={create} disabled={createSkill.isPending} className="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors disabled:opacity-50">
                 <Plus className="w-3.5 h-3.5" />
@@ -249,7 +249,7 @@ export default function SoftskillsPage() {
                 "px-3 h-7 rounded-md text-xs font-semibold uppercase transition-all",
                 language === l ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
               )}>
-                {l === "en" ? "English" : "Français"}
+                {l === "en" ? t("langEnglish") : t("langFrench")}
               </button>
             ))}
           </div>

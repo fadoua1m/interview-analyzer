@@ -1,30 +1,20 @@
 import { useState, useEffect } from "react";
-import { useCreateJob, useUpdateJob,useEnhanceDescription,
-  useGenerateRequirements,
-  useEnhanceRequirements, } from "../../hooks/useJobs";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  useCreateJob, useUpdateJob, useEnhanceDescription,
+  useGenerateRequirements, useEnhanceRequirements,
+} from "../../hooks/useJobs";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label }    from "@/components/ui/label";
-import {
-  Plus,
-  Pencil,
-  Sparkles,
-  Wand2,
-  RefreshCw,
-  CheckCircle2,
-  Loader2,
-} from "lucide-react";
+import { Plus, Pencil, Sparkles, Wand2, RefreshCw, CheckCircle2, Loader2 } from "lucide-react";
 import { cn }    from "@/lib/utils";
 import { toast } from "sonner";
+import { useI18n } from "@/lib/i18n";
 import { LEVELS, LEVEL_STYLES } from "./LevelBadge";
 
 const EMPTY_FORM = {
@@ -33,6 +23,7 @@ const EMPTY_FORM = {
   description:     "",
   requirements:    "",
   seniority_level: "junior",
+  language:        "en",
 };
 
 const RING_COLORS = {
@@ -51,18 +42,18 @@ function AIShimmer() {
   return (
     <div className="absolute inset-0 rounded-lg overflow-hidden pointer-events-none z-10">
       <div
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-100/70 to-transparent"
+        className="absolute inset-0 bg-linear-to-r from-transparent via-indigo-100/70 to-transparent"
         style={{ animation: "shimmer 1.4s infinite" }}
       />
     </div>
   );
 }
 
-function AIButton({ onClick, loading, done, variant = "enhance", disabled }) {
+function AIButton({ onClick, loading, done, variant = "enhance", disabled, t }) {
   const cfg = {
-    enhance:    { Icon: Sparkles,  label: "Enhance",  active: "Enhancing…"    },
-    generate:   { Icon: Wand2,     label: "Generate", active: "Generating…"   },
-    regenerate: { Icon: RefreshCw, label: "Redo",     active: "Regenerating…" },
+    enhance:    { Icon: Sparkles,  labelKey: "enhance",     activeKey: "enhancing"     },
+    generate:   { Icon: Wand2,     labelKey: "generate",    activeKey: "generating"    },
+    regenerate: { Icon: RefreshCw, labelKey: "redo",        activeKey: "regenerating"  },
   }[variant];
 
   return (
@@ -86,7 +77,7 @@ function AIButton({ onClick, loading, done, variant = "enhance", disabled }) {
       ) : (
         <cfg.Icon className="w-3 h-3" />
       )}
-      {loading ? cfg.active : done ? "Applied!" : cfg.label}
+      {loading ? t(cfg.activeKey) : done ? t("aiApplied") : t(cfg.labelKey)}
     </button>
   );
 }
@@ -95,6 +86,7 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
   const isEdit    = !!initial;
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
+  const { t }     = useI18n();
 
   const enhanceDesc  = useEnhanceDescription();
   const generateReqs = useGenerateRequirements();
@@ -117,59 +109,64 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
     }
   };
 
+  const setLang = (lang) => setForm((f) => ({ ...f, language: lang }));
+
   const handleEnhanceDescription = async () => {
-    if (!form.description.trim()) { toast.error("Write a description first"); return; }
+    if (!form.description.trim()) { toast.error(t("writeDescriptionFirst")); return; }
     try {
       const result = await enhanceDesc.mutateAsync({
         title:       form.title   || "Untitled Role",
         company:     form.company || "Our Company",
         description: form.description,
+        language:    form.language,
       });
       setForm((f) => ({ ...f, description: result }));
       setAiApplied((a) => ({ ...a, description: true }));
-      toast.success("Description enhanced!");
+      toast.success(t("descriptionEnhanced"));
     } catch {
-      toast.error("AI failed — check your Gemini API key");
+      toast.error(t("aiFailed"));
     }
   };
 
   const handleGenerateRequirements = async () => {
-    if (!form.description.trim()) { toast.error("Add a description first so AI has context"); return; }
+    if (!form.description.trim()) { toast.error(t("addDescriptionForAI")); return; }
     try {
       const result = await generateReqs.mutateAsync({
         title:       form.title   || "Untitled Role",
         company:     form.company || "Our Company",
         description: form.description,
+        language:    form.language,
       });
       setForm((f) => ({ ...f, requirements: result }));
       setAiApplied((a) => ({ ...a, requirements: true }));
-      toast.success("Requirements generated!");
+      toast.success(t("requirementsGenerated"));
     } catch {
-      toast.error("AI failed — check your Gemini API key");
+      toast.error(t("aiFailed"));
     }
   };
 
   const handleEnhanceRequirements = async () => {
-    if (!form.requirements.trim()) { toast.error("Write some requirements first"); return; }
+    if (!form.requirements.trim()) { toast.error(t("writeRequirementsFirst")); return; }
     try {
       const result = await enhanceReqs.mutateAsync({
         title:        form.title || "Untitled Role",
         requirements: form.requirements,
+        language:     form.language,
       });
       setForm((f) => ({ ...f, requirements: result }));
       setAiApplied((a) => ({ ...a, requirements: true }));
-      toast.success("Requirements enhanced!");
+      toast.success(t("requirementsEnhanced"));
     } catch {
-      toast.error("AI failed — check your Gemini API key");
+      toast.error(t("aiFailed"));
     }
   };
 
   const validate = () => {
     const e = {};
-    if (!form.title.trim())        e.title        = "Title is required";
-    if (!form.company.trim())      e.company      = "Company is required";
-    if (!form.description.trim())  e.description  = "Description is required";
-    if (!form.requirements.trim()) e.requirements = "Requirements are required";
+    if (!form.title.trim())        e.title        = t("titleRequired");
+    if (!form.company.trim())      e.company      = t("companyRequired");
+    if (!form.description.trim())  e.description  = t("descriptionRequired");
+    if (!form.requirements.trim()) e.requirements = t("requirementsRequired");
     return e;
   };
 
@@ -180,14 +177,14 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
     try {
       if (isEdit) {
         await updateJob.mutateAsync({ id: initial.id, data: form });
-        toast.success("Job updated!");
+        toast.success(t("jobUpdated"));
       } else {
         await createJob.mutateAsync(form);
-        toast.success("Job created!");
+        toast.success(t("jobCreated"));
       }
       onClose();
     } catch {
-      toast.error(isEdit ? "Failed to update job" : "Failed to create job");
+      toast.error(isEdit ? t("failedUpdateJob") : t("failedCreateJob"));
     }
   };
 
@@ -196,21 +193,42 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) { setErrors({}); onClose(); } }}>
-      <DialogContent className="sm:max-w-[620px] max-h-[92vh] overflow-y-auto p-0">
+      <DialogContent className="sm:max-w-155 max-h-[92vh] overflow-y-auto p-0">
 
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
-              {isEdit ? <Pencil className="w-4 h-4 text-white" /> : <Plus className="w-4 h-4 text-white" />}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
+                {isEdit ? <Pencil className="w-4 h-4 text-white" /> : <Plus className="w-4 h-4 text-white" />}
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold text-slate-900">
+                  {isEdit ? t("editJob") : t("addNewJob")}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-indigo-400" />
+                  {t("aiAssisted")}
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className="text-base font-semibold text-slate-900">
-                {isEdit ? "Edit Job" : "Add New Job"}
-              </DialogTitle>
-              <DialogDescription className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-indigo-400" />
-                AI-assisted with Gemini
-              </DialogDescription>
+
+            {/* Language toggle */}
+            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 shrink-0">
+              {["en", "fr"].map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => setLang(l)}
+                  className={cn(
+                    "px-3 h-7 rounded-md text-xs font-semibold uppercase transition-all",
+                    form.language === l
+                      ? "bg-white text-slate-800 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  {l === "en" ? t("langEnglish") : t("langFrench")}
+                </button>
+              ))}
             </div>
           </div>
         </DialogHeader>
@@ -220,7 +238,7 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="title" className="text-xs font-medium text-slate-700">
-                Job Title <span className="text-red-400">*</span>
+                {t("jobTitle")} <span className="text-red-400">*</span>
               </Label>
               <Input
                 id="title"
@@ -233,7 +251,7 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="company" className="text-xs font-medium text-slate-700">
-                Company <span className="text-red-400">*</span>
+                {t("jobCompany")} <span className="text-red-400">*</span>
               </Label>
               <Input
                 id="company"
@@ -247,7 +265,7 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-700">Seniority Level</Label>
+            <Label className="text-xs font-medium text-slate-700">{t("seniorityLevel")}</Label>
             <div className="flex gap-2 flex-wrap">
               {LEVELS.map((lvl) => (
                 <button
@@ -271,9 +289,10 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="description" className="text-xs font-medium text-slate-700">
-                Job Description <span className="text-red-400">*</span>
+                {t("jobDescription")} <span className="text-red-400">*</span>
               </Label>
               <AIButton
+                t={t}
                 variant={aiApplied.description ? "regenerate" : "enhance"}
                 onClick={handleEnhanceDescription}
                 loading={enhanceDesc.isPending}
@@ -284,7 +303,7 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
             <div className="relative">
               <Textarea
                 id="description"
-                placeholder="Write a rough draft and let AI polish it, or type the full description yourself…"
+                placeholder={t("jobDescriptionPlaceholder")}
                 rows={5}
                 value={form.description}
                 onChange={set("description")}
@@ -304,10 +323,11 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <Label htmlFor="requirements" className="text-xs font-medium text-slate-700">
-                Requirements <span className="text-red-400">*</span>
+                {t("jobRequirements")} <span className="text-red-400">*</span>
               </Label>
               <div className="flex items-center gap-1.5">
                 <AIButton
+                  t={t}
                   variant="generate"
                   onClick={handleGenerateRequirements}
                   loading={generateReqs.isPending}
@@ -316,6 +336,7 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
                 />
                 {form.requirements.trim() && (
                   <AIButton
+                    t={t}
                     variant={aiApplied.requirements ? "regenerate" : "enhance"}
                     onClick={handleEnhanceRequirements}
                     loading={enhanceReqs.isPending}
@@ -325,15 +346,11 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
                 )}
               </div>
             </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Type your own, use{" "}
-              <span className="text-indigo-500 font-medium">Generate</span> to create from description, or{" "}
-              <span className="text-indigo-500 font-medium">Enhance</span> to polish what you wrote.
-            </p>
+            <p className="text-[11px] text-slate-400 leading-relaxed">{t("requirementsHint")}</p>
             <div className="relative">
               <Textarea
                 id="requirements"
-                placeholder="List required skills, tools, years of experience… (or let AI generate them)"
+                placeholder={t("requirementsPlaceholder")}
                 rows={5}
                 value={form.requirements}
                 onChange={set("requirements")}
@@ -355,21 +372,21 @@ export default function JobFormDialog({ open, onClose, initial = null }) {
           {anyAILoading && (
             <div className="flex items-center gap-1.5 text-xs text-indigo-500 mr-auto animate-pulse">
               <Sparkles className="w-3.5 h-3.5" />
-              Gemini is thinking…
+              {t("aiThinking")}
             </div>
           )}
           <Button variant="outline" size="sm" onClick={onClose} disabled={isSaving || anyAILoading}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button
             size="sm"
             onClick={handleSubmit}
             disabled={isSaving || anyAILoading}
-            className="bg-slate-900 hover:bg-slate-700 text-white min-w-[110px]"
+            className="bg-slate-900 hover:bg-slate-700 text-white min-w-27.5"
           >
             {isSaving
-              ? (isEdit ? "Saving…" : "Creating…")
-              : (isEdit ? "Save Changes" : "Create Job")}
+              ? (isEdit ? t("saving") : t("creating"))
+              : (isEdit ? t("saveChanges") : t("createJob"))}
           </Button>
         </DialogFooter>
 

@@ -1,30 +1,28 @@
 // src/pages/Dashboard.jsx
 import { useNavigate } from "react-router-dom";
 import { useJobs } from "../hooks/useJobs";
-import { useInterviews } from "../hooks/useInterviews";
+import { useInterviews, useDashboardSummary } from "../hooks/useInterviews";
 import {
-  Briefcase, TrendingUp, Mic, Users,
+  Briefcase, Mic, Users, Clock,
   ArrowRight, Plus, Sparkles, ChevronRight,
-  Star, Clock, Layers,
+  Layers, CheckCircle2, AlertCircle, XCircle,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useI18n } from "@/lib/i18n";
 
-// ── Palette ───────────────────────────────────────────────────────────────────
-const LEVEL_CONFIG = {
-  junior: { color: "text-sky-600",    bg: "bg-sky-50",    bar: "bg-sky-400",    border: "border-sky-100"    },
-  mid:    { color: "text-violet-600", bg: "bg-violet-50", bar: "bg-violet-400", border: "border-violet-100" },
-  senior: { color: "text-amber-600",  bg: "bg-amber-50",  bar: "bg-amber-400",  border: "border-amber-100"  },
-  lead:   { color: "text-rose-600",   bg: "bg-rose-50",   bar: "bg-rose-400",   border: "border-rose-100"   },
-};
-
 const INTERVIEW_TYPE_COLOR = {
   behavioral: { bg: "bg-blue-100",    text: "text-blue-700"    },
   technical:  { bg: "bg-violet-100",  text: "text-violet-700"  },
   hr:         { bg: "bg-emerald-100", text: "text-emerald-700" },
   mixed:      { bg: "bg-amber-100",   text: "text-amber-700"   },
+};
+
+const DECISION_CFG = {
+  PROCEED: { icon: CheckCircle2, bg: "bg-emerald-50",  text: "text-emerald-700", badge: "bg-emerald-500", labelKey: "decisionProceed" },
+  REVIEW:  { icon: AlertCircle,  bg: "bg-amber-50",    text: "text-amber-700",   badge: "bg-amber-500",   labelKey: "decisionReview"  },
+  REJECT:  { icon: XCircle,      bg: "bg-red-50",      text: "text-red-700",     badge: "bg-red-500",     labelKey: "decisionReject"  },
 };
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -39,7 +37,6 @@ function StatCard({ icon: Icon, label, value, sub, gradient, loading, onClick })
         onClick && "cursor-pointer"
       )}
     >
-      {/* Background gradient blob */}
       <div className={cn(
         "absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-10 blur-xl transition-opacity group-hover:opacity-20",
         gradient
@@ -74,37 +71,6 @@ function StatCard({ icon: Icon, label, value, sub, gradient, loading, onClick })
   );
 }
 
-// ── Seniority distribution ────────────────────────────────────────────────────
-function SeniorityChart({ jobs }) {
-  const total = jobs.length || 1;
-  const counts = jobs.reduce((acc, j) => {
-    acc[j.seniority_level] = (acc[j.seniority_level] || 0) + 1;
-    return acc;
-  }, {});
-
-  return (
-    <div className="space-y-2.5">
-      {["junior", "mid", "senior", "lead"].map((level) => {
-        const cfg = LEVEL_CONFIG[level];
-        const count = counts[level] || 0;
-        const pct = Math.round((count / total) * 100);
-        return (
-          <div key={level} className="flex items-center gap-3">
-            <span className={cn("text-xs font-medium w-12 shrink-0 capitalize", cfg.color)}>{level}</span>
-            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={cn("h-full rounded-full transition-all duration-700 ease-out", cfg.bar)}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="text-xs text-slate-500 w-5 text-right tabular-nums shrink-0">{count}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── Interview type distribution ───────────────────────────────────────────────
 function InterviewTypeBadges({ interviews }) {
   const counts = interviews.reduce((acc, iv) => {
@@ -113,7 +79,7 @@ function InterviewTypeBadges({ interviews }) {
   }, {});
 
   const types = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  if (!types.length) return <p className="text-xs text-slate-400">No interviews yet.</p>;
+  if (!types.length) return <p className="text-xs text-slate-400">—</p>;
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -130,40 +96,87 @@ function InterviewTypeBadges({ interviews }) {
   );
 }
 
+// ── Recent activity feed ──────────────────────────────────────────────────────
+function RecentActivity({ items, loading, t, lang, onNavigate }) {
+  if (loading) {
+    return (
+      <div className="space-y-3 px-5 py-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <Skeleton className="h-3.5 w-32 rounded" />
+              <Skeleton className="h-3 w-20 rounded" />
+            </div>
+            <Skeleton className="h-5 w-16 rounded-full shrink-0" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!items?.length) {
+    return (
+      <div className="px-5 py-8 text-center">
+        <p className="text-xs text-slate-400">{t("noCandidatesAnalysed")}</p>
+      </div>
+    );
+  }
+
+  const locale = lang === "fr" ? dateFnsFr : undefined;
+
+  return (
+    <div className="px-5 py-3 space-y-1">
+      {items.map((item) => {
+        const dcfg = DECISION_CFG[item.decision] || DECISION_CFG.REVIEW;
+        const DecIcon = dcfg.icon;
+        return (
+          <div
+            key={item.id}
+            className="group flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-0"
+          >
+            <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", dcfg.badge)}>
+              <DecIcon className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-800 truncate">{item.candidate_name}</p>
+              <p className="text-xs text-slate-400 truncate">{item.interview_title}</p>
+            </div>
+            <div className="flex flex-col items-end gap-0.5 shrink-0">
+              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", dcfg.bg, dcfg.text)}>
+                {t(dcfg.labelKey)}
+              </span>
+              {item.overall_score > 0 && (
+                <span className="text-[10px] text-slate-400 tabular-nums">{Math.round(item.overall_score)}/100</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Recent job row ────────────────────────────────────────────────────────────
 function JobRow({ job }) {
   const navigate = useNavigate();
-  const cfg = LEVEL_CONFIG[job.seniority_level];
   return (
     <button
       onClick={() => navigate("/jobs")}
       className="group w-full flex items-center gap-3 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50/80 -mx-2 px-2 rounded-lg transition-colors"
     >
-      <div className={cn(
-        "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold transition-colors",
-        cfg?.bg ?? "bg-slate-100",
-        cfg?.color ?? "text-slate-600"
-      )}>
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold bg-slate-100 text-slate-600">
         {job.company?.[0]?.toUpperCase() ?? "?"}
       </div>
       <div className="flex-1 min-w-0 text-left">
         <p className="text-sm font-medium text-slate-800 truncate group-hover:text-slate-900">{job.title}</p>
         <p className="text-xs text-slate-400 truncate">{job.company}</p>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <span className={cn(
-          "text-[11px] font-medium px-2 py-0.5 rounded-full capitalize",
-          cfg?.bg ?? "bg-slate-100",
-          cfg?.color ?? "text-slate-500"
-        )}>
-          {job.seniority_level}
+      {job.created_at && (
+        <span className="text-[11px] text-slate-400 hidden sm:block shrink-0">
+          {format(new Date(job.created_at), "MMM d")}
         </span>
-        {job.created_at && (
-          <span className="text-[11px] text-slate-400 hidden sm:block">
-            {format(new Date(job.created_at), "MMM d")}
-          </span>
-        )}
-      </div>
+      )}
     </button>
   );
 }
@@ -194,15 +207,16 @@ function QuickAction({ icon: Icon, label, description, onClick, gradient }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { data: jobs = [],        isLoading: loadingJobs }        = useJobs();
-  const { data: interviews = [],  isLoading: loadingInterviews }  = useInterviews();
+  const { data: jobs = [],       isLoading: loadingJobs }       = useJobs();
+  const { data: interviews = [], isLoading: loadingInterviews } = useInterviews();
+  const { data: summary,         isLoading: loadingSummary }    = useDashboardSummary();
   const navigate = useNavigate();
   const { t, lang } = useI18n();
 
   const loading = loadingJobs || loadingInterviews;
-  const recentJobs = [...jobs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 6);
-  const seniorLeadCount = jobs.filter((j) => ["senior", "lead"].includes(j.seniority_level)).length;
-  const processedCount  = interviews.filter((iv) => iv.status === "processed").length;
+  const recentJobs     = [...jobs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 6);
+  const processedCount = interviews.reduce((sum, iv) => sum + (iv.processed_count || 0), 0);
+  const pendingCount   = summary?.pending_count ?? 0;
 
   const dateLabel = new Date().toLocaleDateString(
     lang === "fr" ? "fr-FR" : "en-US",
@@ -216,7 +230,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+            <div className="w-6 h-6 rounded-lg bg-linear-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
               <Sparkles className="w-3 h-3 text-white" />
             </div>
             <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">AI Analyzer</span>
@@ -239,7 +253,6 @@ export default function Dashboard() {
           icon={Briefcase}
           label={t("totalJobs")}
           value={jobs.length}
-          sub={`${recentJobs.length} recent positions`}
           gradient="bg-indigo-600"
           loading={loadingJobs}
           onClick={() => navigate("/jobs")}
@@ -248,25 +261,24 @@ export default function Dashboard() {
           icon={Mic}
           label={t("interviews")}
           value={interviews.length}
-          sub={`${interviews.length} sessions created`}
           gradient="bg-sky-500"
           loading={loadingInterviews}
           onClick={() => navigate("/interviews")}
         />
         <StatCard
-          icon={Star}
-          label={t("seniorLead")}
-          value={seniorLeadCount}
-          sub="Senior & Lead roles"
+          icon={Clock}
+          label={t("pendingReview")}
+          value={pendingCount}
+          sub={t("awaitingAnalysis")}
           gradient="bg-amber-500"
-          loading={loadingJobs}
-          onClick={() => navigate("/jobs")}
+          loading={loadingSummary}
+          onClick={() => navigate("/interviews")}
         />
         <StatCard
           icon={Users}
-          label="Processed"
+          label={t("processed")}
           value={processedCount}
-          sub="Candidate analyses done"
+          sub={t("candidateAnalysesDone")}
           gradient="bg-emerald-500"
           loading={loading}
         />
@@ -324,36 +336,35 @@ export default function Dashboard() {
         {/* Right column — 2 cols */}
         <div className="lg:col-span-2 flex flex-col gap-5">
 
-          {/* Seniority breakdown */}
+          {/* Recent Activity */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100">
-              <h2 className="text-sm font-semibold text-slate-900">{t("bySeniority")}</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{t("distributionAcrossLevels")}</p>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">{t("recentActivity")}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{t("latestAnalyses")}</p>
+              </div>
+              <button
+                onClick={() => navigate("/interviews")}
+                className="flex items-center gap-1 text-xs font-medium text-indigo-500 hover:text-indigo-700 transition-colors"
+              >
+                {t("viewAll")}
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <div className="px-5 py-4">
-              {loadingJobs ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <Skeleton className="h-3 w-12 rounded" />
-                      <Skeleton className="h-2 flex-1 rounded-full" />
-                      <Skeleton className="h-3 w-4 rounded" />
-                    </div>
-                  ))}
-                </div>
-              ) : !jobs.length ? (
-                <p className="text-xs text-slate-400 text-center py-4">{t("noDataYet")}</p>
-              ) : (
-                <SeniorityChart jobs={jobs} />
-              )}
-            </div>
+            <RecentActivity
+              items={summary?.recent_processed}
+              loading={loadingSummary}
+              t={t}
+              lang={lang}
+              onNavigate={navigate}
+            />
           </div>
 
           {/* Interview types */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
-              <h2 className="text-sm font-semibold text-slate-900">Interview Types</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Breakdown by category</p>
+              <h2 className="text-sm font-semibold text-slate-900">{t("interviews")}</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{t("allTypes")}</p>
             </div>
             <div className="px-5 py-4">
               {loadingInterviews ? (
@@ -369,28 +380,28 @@ export default function Dashboard() {
           {/* Quick actions */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
-              <h2 className="text-sm font-semibold text-slate-900">Quick Actions</h2>
+              <h2 className="text-sm font-semibold text-slate-900">{t("addJob")}</h2>
             </div>
             <div className="p-4 space-y-2">
               <QuickAction
                 icon={Briefcase}
                 label={t("addJob")}
-                description="Post a new position"
-                gradient="bg-gradient-to-br from-indigo-500 to-violet-600"
+                description={lang === "fr" ? "Publier une nouvelle offre" : "Post a new position"}
+                gradient="bg-linear-to-br from-indigo-500 to-violet-600"
                 onClick={() => navigate("/jobs")}
               />
               <QuickAction
                 icon={Mic}
                 label={t("newInterview")}
-                description="Set up an interview session"
-                gradient="bg-gradient-to-br from-sky-500 to-indigo-500"
+                description={lang === "fr" ? "Configurer une session d'entretien" : "Set up an interview session"}
+                gradient="bg-linear-to-br from-sky-500 to-indigo-500"
                 onClick={() => navigate("/interviews")}
               />
               <QuickAction
                 icon={Clock}
-                label="Review Candidates"
-                description="Check processed reports"
-                gradient="bg-gradient-to-br from-emerald-500 to-teal-500"
+                label={lang === "fr" ? "Examiner les candidats" : "Review Candidates"}
+                description={lang === "fr" ? "Consulter les rapports traites" : "Check processed reports"}
+                gradient="bg-linear-to-br from-emerald-500 to-teal-500"
                 onClick={() => navigate("/interviews")}
               />
             </div>

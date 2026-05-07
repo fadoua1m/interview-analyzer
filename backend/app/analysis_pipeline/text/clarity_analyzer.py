@@ -101,7 +101,7 @@ class ClarityAnalysis:
 
 # ── Per-pair worker ────────────────────────────────────────────────────────────
 
-def _analyze_one(pair: QAPair) -> ClarityAnalysis:
+def _analyze_one(pair: QAPair, language: str = "en") -> ClarityAnalysis:
     answer = (pair.answer or "").strip()
     answer_words = len(answer.split()) if answer else 0
     
@@ -142,7 +142,7 @@ def _analyze_one(pair: QAPair) -> ClarityAnalysis:
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def run(qa_pairs: list[QAPair]) -> list[ClarityAnalysis]:
+def run(qa_pairs: list[QAPair], language: str = "en") -> list[ClarityAnalysis]:
     """Analyze clarity for all QA pairs in parallel.
     Returns a list aligned 1-to-1 with qa_pairs. Never raises.
     """
@@ -153,7 +153,7 @@ def run(qa_pairs: list[QAPair]) -> list[ClarityAnalysis]:
     max_workers = min(len(qa_pairs), settings.text_relevance_max_workers)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_analyze_one, p): i for i, p in enumerate(qa_pairs)}
+        futures = {executor.submit(_analyze_one, p, language): i for i, p in enumerate(qa_pairs)}
         for future in as_completed(futures):
             idx = futures[future]
             try:

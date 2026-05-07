@@ -29,10 +29,10 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 
 const TYPES = [
-  { value: "behavioral", label: "Behavioral", icon: Users,     color: "border-blue-300   bg-blue-50   text-blue-700",    ring: "ring-blue-300"    },
-  { value: "technical",  label: "Technical",  icon: Code2,     color: "border-violet-300 bg-violet-50 text-violet-700",  ring: "ring-violet-300"  },
-  { value: "hr",         label: "HR",         icon: Briefcase, color: "border-emerald-300 bg-emerald-50 text-emerald-700", ring: "ring-emerald-300" },
-  { value: "mixed",      label: "Mixed",      icon: Layers,    color: "border-amber-300  bg-amber-50  text-amber-700",   ring: "ring-amber-300"   },
+  { value: "behavioral", labelKey: "typeBehavioral", icon: Users,     color: "border-blue-300   bg-blue-50   text-blue-700",    ring: "ring-blue-300"    },
+  { value: "technical",  labelKey: "typeTechnical",  icon: Code2,     color: "border-violet-300 bg-violet-50 text-violet-700",  ring: "ring-violet-300"  },
+  { value: "hr",         labelKey: "typeHr",         icon: Briefcase, color: "border-emerald-300 bg-emerald-50 text-emerald-700", ring: "ring-emerald-300" },
+  { value: "mixed",      labelKey: "typeMixed",      icon: Layers,    color: "border-amber-300  bg-amber-50  text-amber-700",   ring: "ring-amber-300"   },
 ];
 const TYPE_MAP = Object.fromEntries(TYPES.map((t) => [t.value, t]));
 
@@ -100,12 +100,14 @@ function JobSelector({ value, onChange, error }) {
 function CreateInterviewForm({ jobId, jobTitle }) {
   const navigate        = useNavigate();
   const createInterview = useCreateInterview();
+  const { t, lang }     = useI18n();
 
   const [form, setForm] = useState({
-    job_id: jobId || "",
-    type:   "behavioral",
-    title:  jobTitle ? `${jobTitle} Interview` : "",
-    notes:  "",
+    job_id:   jobId || "",
+    type:     "behavioral",
+    title:    jobTitle ? `${jobTitle} Interview` : "",
+    notes:    "",
+    language: lang,
   });
   const [errors, setErrors] = useState({});
 
@@ -135,7 +137,7 @@ function CreateInterviewForm({ jobId, jobTitle }) {
 
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-slate-700">
-            Interview Title <span className="text-red-400">*</span>
+            {t("interviewTitle")} <span className="text-red-400">*</span>
           </Label>
           <Input placeholder="e.g. Frontend Engineer – Technical Round"
             value={form.title}
@@ -159,9 +161,9 @@ function CreateInterviewForm({ jobId, jobTitle }) {
         )}
 
         <div className="space-y-2">
-          <Label className="text-xs font-medium text-slate-700">Interview Type</Label>
+          <Label className="text-xs font-medium text-slate-700">{t("interviewType")}</Label>
           <div className="grid grid-cols-2 gap-2">
-            {TYPES.map(({ value, label, icon: Icon, color, ring }) => (
+            {TYPES.map(({ value, labelKey, icon: Icon, color, ring }) => (
               <button key={value} type="button"
                 onClick={() => setForm((f) => ({ ...f, type: value }))}
                 className={cn(
@@ -172,14 +174,33 @@ function CreateInterviewForm({ jobId, jobTitle }) {
                 )}
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-700">Notes (optional)</Label>
+          <Label className="text-xs font-medium text-slate-700">{t("interviewLanguage")}</Label>
+          <div className="flex gap-2">
+            {["en", "fr"].map((lng) => (
+              <button key={lng} type="button"
+                onClick={() => setForm((f) => ({ ...f, language: lng }))}
+                className={cn(
+                  "flex-1 h-9 rounded-lg border text-sm font-medium transition-all",
+                  form.language === lng
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                )}
+              >
+                {lng === "en" ? t("langEnglish") : t("langFrench")}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-slate-700">{t("notesOptional")}</Label>
           <Textarea placeholder="Any notes about this interview round…"
             rows={3} value={form.notes}
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
@@ -188,10 +209,10 @@ function CreateInterviewForm({ jobId, jobTitle }) {
         </div>
 
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="outline" size="sm" onClick={() => navigate(-1)}>Cancel</Button>
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)}>{t("cancel")}</Button>
           <Button size="sm" onClick={handleSubmit} disabled={createInterview.isPending}
             className="bg-slate-900 hover:bg-slate-700 text-white min-w-32.5">
-            {createInterview.isPending ? "Creating…" : "Create Interview"}
+            {createInterview.isPending ? t("creating") : t("createInterview")}
           </Button>
         </div>
       </div>
@@ -217,6 +238,7 @@ function GenerateQuestionsPanel({ interview, job, onClose }) {
         description:     job.description  || "",
         requirements:    job.requirements || "",
         count,
+        language:        interview.language || "en",
       });
       setPreview(questions);
     } catch {
@@ -370,6 +392,7 @@ function QuestionRow({ question, interview, job, interviewId, index }) {
     title:           job?.title           || "",
     interview_type:  interview.type,
     seniority_level: job?.seniority_level || "",
+    language:        interview.language   || "en",
   };
 
   const save = async () => {
@@ -819,6 +842,7 @@ export default function InterviewDetail() {
   const jobId    = searchParams.get("job_id");
   const jobTitle = searchParams.get("job_title");
 
+  const { t, lang } = useI18n();
   const { data: interview, isLoading, isError } = useInterview(isNew ? null : id);
   const { data: jobs = [] } = useJobs();
   const { data: bankSkills = [] } = useSoftskillsBank({ active: true });
@@ -961,7 +985,10 @@ export default function InterviewDetail() {
                 typeConfig.color
               )}>
                 <TypeIcon className="w-3 h-3" />
-                {typeConfig.label}
+                {t(typeConfig.labelKey)}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border border-slate-200 bg-slate-50 text-slate-600 uppercase">
+                {interview.language || "en"}
               </span>
               {job && (
                 <span className="inline-flex items-center gap-1 text-xs text-slate-500">

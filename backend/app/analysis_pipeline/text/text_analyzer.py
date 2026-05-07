@@ -6,41 +6,17 @@ Main orchestrator for text analysis of interview responses.
 Orchestrates:
   - clarity_analyzer       : Clarity score + language confidence + STAR coverage
   - relevance_scorer       : Relevance scoring (0-10, optional rubric)
-  - competency_detector    : Soft skills/competency detection (language-aware)
+    - competency_detector    : Soft skills/competency detection
 """
+
+import logging
 
 from app.schemas.analysis import QAPair
 from app.analysis_pipeline.text.clarity_analyzer    import run as analyze_clarity,    ClarityAnalysis
 from app.analysis_pipeline.text.relevance_scorer     import run as score_relevance
 from app.analysis_pipeline.text.competency_detector  import run as detect_competencies
 
-
-# ── Language detection ─────────────────────────────────────────────────────────
-
-_FR_MARKERS = {
-    "je", "tu", "il", "elle", "nous", "vous", "ils", "elles",
-    "est", "sont", "était", "ont", "une", "des", "les", "sur",
-    "dans", "avec", "pour", "mais", "que", "qui", "par", "ou",
-    "mon", "ma", "mes", "ce", "cette", "ces", "donc", "aussi",
-}
-_EN_MARKERS = {
-    "i", "the", "a", "is", "was", "were", "have", "had",
-    "my", "our", "we", "it", "in", "on", "to", "of",
-    "and", "but", "that", "this", "with", "for", "by", "at",
-    "he", "she", "they", "you", "as", "an", "so",
-}
-
-
-def _detect_language(text: str) -> str:
-    """Return 'fr' or 'en' based on token frequency in the given text."""
-    tokens = text.lower().split()
-    if not tokens:
-        return "en"
-    fr_hits = sum(1 for t in tokens if t in _FR_MARKERS)
-    en_hits = sum(1 for t in tokens if t in _EN_MARKERS)
-    if fr_hits > en_hits + 1:
-        return "fr"
-    return "en"
+logger = logging.getLogger(__name__)
 
 
 # ── Result class ───────────────────────────────────────────────────────────────
@@ -103,25 +79,17 @@ def analyze_text(qa_pairs: list[QAPair], language: str | None = None) -> TextAna
         TextAnalysisResult with clarity, relevance, and competency analysis.
     """
     if not qa_pairs:
-        return TextAnalysisResult(qa_pairs=[], detected_language=language or "en")
+        return TextAnalysisResult(qa_pairs=[], detected_language="en")
 
-    if language is None:
-        sample = " ".join((p.answer or "") for p in qa_pairs if p.answer)[:3000]
-        language = _detect_language(sample)
-        print(f"[TextAnalyzer] Auto-detected language: {language}")
-    else:
-        language = language.strip().lower()
-        if language not in {"en", "fr"}:
-            language = "en"
-
+    # Text analysis is intentionally English-only.
     clarity_results   = analyze_clarity(qa_pairs)
     relevance_results = score_relevance(qa_pairs)
-    competencies      = detect_competencies(qa_pairs, language=language)
+    competencies      = detect_competencies(qa_pairs)
 
     return TextAnalysisResult(
         qa_pairs=qa_pairs,
         clarity_results=clarity_results,
         relevance_results=relevance_results,
         competencies=competencies,
-        detected_language=language,
+        detected_language="en",
     )

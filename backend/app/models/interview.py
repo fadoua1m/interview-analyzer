@@ -20,6 +20,7 @@ class Interview(Base):
     title      = Column(String, nullable=False)
     notes      = Column(Text, nullable=True)
     target_softskills = Column(ARRAY(String), nullable=False, default=list)
+    language    = Column(String(2), nullable=False, server_default="en")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

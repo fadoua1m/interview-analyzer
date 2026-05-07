@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import LevelBadge from "./LevelBadge";
 import { useInterviewByJob } from "../../hooks/useInterviews";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 const TYPE_STYLES = {
   behavioral: "bg-blue-50   text-blue-700   border-blue-200",
@@ -23,14 +24,14 @@ const TYPE_STYLES = {
 
 export default function JobSheet({ job, open, onClose, onEdit }) {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const { data: interview, isLoading: loadingInterview } = useInterviewByJob(job?.id);
   const hasInterview = !!interview;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      {/* Fixed-size dialog — never scrolls as a whole */}
       <DialogContent
-        className="sm:max-w-[900px] p-0 overflow-hidden"
+        className="sm:max-w-225 p-0 overflow-hidden"
         style={{ height: "600px", display: "flex", flexDirection: "column" }}
       >
 
@@ -53,7 +54,7 @@ export default function JobSheet({ job, open, onClose, onEdit }) {
               <LevelBadge level={job?.seniority_level} />
               <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1.5"
                 onClick={() => { onClose(); onEdit(job); }}>
-                <Pencil className="w-3 h-3" /> Edit
+                <Pencil className="w-3 h-3" /> {t("edit")}
               </Button>
             </div>
           </div>
@@ -62,13 +63,13 @@ export default function JobSheet({ job, open, onClose, onEdit }) {
             {job?.created_at && (
               <div className="flex items-center gap-1.5 text-xs text-slate-400">
                 <Calendar className="w-3.5 h-3.5" />
-                Added {format(new Date(job.created_at), "MMMM d, yyyy")}
+                {t("addedDate")} {format(new Date(job.created_at), "MMMM d, yyyy")}
               </div>
             )}
             {job?.updated_at && (
               <div className="flex items-center gap-1.5 text-xs text-slate-400">
                 <RefreshCw className="w-3.5 h-3.5" />
-                Updated {format(new Date(job.updated_at), "MMM d, yyyy")}
+                {t("updatedDate")} {format(new Date(job.updated_at), "MMM d, yyyy")}
               </div>
             )}
           </div>
@@ -83,12 +84,12 @@ export default function JobSheet({ job, open, onClose, onEdit }) {
             {/* Description — scrollable */}
             <div className="flex flex-col flex-1 min-h-0 px-6 py-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 shrink-0">
-                Job Description
+                {t("jobDescription")}
               </p>
               <div className="flex-1 overflow-y-auto rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
                 {job?.description
                   ? <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{job.description}</p>
-                  : <p className="text-sm text-slate-400 italic">No description provided.</p>
+                  : <p className="text-sm text-slate-400 italic">{t("noDescriptionProvided")}</p>
                 }
               </div>
             </div>
@@ -96,12 +97,12 @@ export default function JobSheet({ job, open, onClose, onEdit }) {
             {/* Requirements — scrollable */}
             <div className="flex flex-col flex-1 min-h-0 px-6 py-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 shrink-0">
-                Requirements
+                {t("jobRequirements")}
               </p>
               <div className="flex-1 overflow-y-auto rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
                 {job?.requirements
                   ? <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{job.requirements}</p>
-                  : <p className="text-sm text-slate-400 italic">No requirements listed.</p>
+                  : <p className="text-sm text-slate-400 italic">{t("noRequirementsListed")}</p>
                 }
               </div>
             </div>
@@ -114,7 +115,7 @@ export default function JobSheet({ job, open, onClose, onEdit }) {
             style={{ width: "260px" }}
           >
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
-              Interview
+              {t("sectionInterview")}
             </p>
 
             {loadingInterview ? (
@@ -140,14 +141,14 @@ export default function JobSheet({ job, open, onClose, onEdit }) {
                     <p className="text-xs text-slate-500 line-clamp-2">{interview.notes}</p>
                   )}
                   <p className="text-[11px] text-slate-400">
-                    Created {format(new Date(interview.created_at), "MMM d, yyyy")}
+                    {format(new Date(interview.created_at), "MMM d, yyyy")}
                   </p>
                 </div>
                 <Button size="sm"
                   onClick={() => { onClose(); navigate(`/interviews/${interview.id}`); }}
                   className="w-full bg-slate-900 hover:bg-slate-700 text-white gap-1.5 text-xs">
                   <Mic className="w-3.5 h-3.5" />
-                  Open Interview
+                  {t("openInterview")}
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Button>
               </div>
@@ -158,9 +159,9 @@ export default function JobSheet({ job, open, onClose, onEdit }) {
                   <Mic className="w-4 h-4 text-slate-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-700">No interview yet</p>
+                  <p className="text-sm font-medium text-slate-700">{t("noInterviewYet")}</p>
                   <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                    Create an interview session for this job
+                    {t("createInterviewForJob")}
                   </p>
                 </div>
                 <Button size="sm"
@@ -170,7 +171,7 @@ export default function JobSheet({ job, open, onClose, onEdit }) {
                   }}
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 text-xs h-8">
                   <Plus className="w-3.5 h-3.5" />
-                  Create Interview
+                  {t("createInterview")}
                 </Button>
               </div>
             )}

@@ -3,8 +3,15 @@
 from app.services.mistral_client import generate
 
 
-def enhance_description(title: str, company: str, description: str) -> str:
-    prompt = f"""Rewrite this job description for a {title} at {company}.
+def _lang_line(language: str) -> str:
+    if language == "fr":
+        return "IMPORTANT : Génère tout le texte en français."
+    return "IMPORTANT: Generate all text in English."
+
+
+def enhance_description(title: str, company: str, description: str, language: str = "en") -> str:
+    prompt = f"""{_lang_line(language)}
+Rewrite this job description for a {title} at {company}.
 
 Original:
 {description[:800]}
@@ -19,8 +26,9 @@ Return only the rewritten description."""
     return generate(prompt)
 
 
-def generate_requirements(title: str, company: str, description: str) -> str:
-    prompt = f"""List requirements for a {title} at {company}.
+def generate_requirements(title: str, company: str, description: str, language: str = "en") -> str:
+    prompt = f"""{_lang_line(language)}
+List requirements for a {title} at {company}.
 
 Job context:
 {description[:600]}
@@ -35,8 +43,9 @@ Return only the numbered list."""
     return generate(prompt)
 
 
-def enhance_requirements(title: str, requirements: str) -> str:
-    prompt = f"""Rewrite these job requirements for a {title} role.
+def enhance_requirements(title: str, requirements: str, language: str = "en") -> str:
+    prompt = f"""{_lang_line(language)}
+Rewrite these job requirements for a {title} role.
 
 Original:
 {requirements[:600]}

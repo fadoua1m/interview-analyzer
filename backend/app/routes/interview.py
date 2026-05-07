@@ -105,13 +105,28 @@ def create_interview(payload: InterviewCreate):
 
 @router.get("", response_model=list[InterviewResponse])
 def list_interviews():
-    result = (
+    rows = (
         supabase.table(INTERVIEWS)
         .select("*")
         .order("created_at", desc=True)
         .execute()
-    )
-    return [_normalize_interview_row(row) for row in (result.data or [])]
+    ).data or []
+
+    if rows:
+        processed = (
+            supabase.table(CANDIDATES)
+            .select("interview_id")
+            .eq("status", "processed")
+            .execute()
+        ).data or []
+        counts: dict[str, int] = {}
+        for c in processed:
+            iid = c["interview_id"]
+            counts[iid] = counts.get(iid, 0) + 1
+        for row in rows:
+            row["processed_count"] = counts.get(row["id"], 0)
+
+    return [_normalize_interview_row(row) for row in rows]
 
 
 @router.get("/job/{job_id}", response_model=InterviewResponse | None)
@@ -124,6 +139,52 @@ def get_interview_by_job(job_id: str):
         .execute()
     )
     return _normalize_interview_row(result.data[0]) if result.data else None
+
+
+@router.get("/dashboard-summary")
+def get_dashboard_summary():
+    """Return pending-review count and last 4 processed candidates for the dashboard."""
+    pending_result = (
+        supabase.table(CANDIDATES)
+        .select("id", count="exact")
+        .eq("status", "submitted")
+        .execute()
+    )
+    pending_count = pending_result.count or 0
+
+    recent_rows = (
+        supabase.table(CANDIDATES)
+        .select("id, name, interview_id, submitted_at, analysis_payload")
+        .eq("status", "processed")
+        .order("submitted_at", desc=True)
+        .limit(4)
+        .execute()
+    ).data or []
+
+    interview_ids = list({r["interview_id"] for r in recent_rows if r.get("interview_id")})
+    title_map: dict[str, str] = {}
+    if interview_ids:
+        iv_rows = (
+            supabase.table(INTERVIEWS)
+            .select("id, title")
+            .in_("id", interview_ids)
+            .execute()
+        ).data or []
+        title_map = {r["id"]: r["title"] for r in iv_rows}
+
+    recent_processed = []
+    for r in recent_rows:
+        payload = r.get("analysis_payload") or {}
+        recent_processed.append({
+            "id":              r.get("id", ""),
+            "candidate_name":  r.get("name", ""),
+            "interview_title": title_map.get(r.get("interview_id", ""), ""),
+            "decision":        payload.get("decision", ""),
+            "overall_score":   payload.get("overall_score", 0),
+            "submitted_at":    r.get("submitted_at"),
+        })
+
+    return {"pending_count": pending_count, "recent_processed": recent_processed}
 
 
 @router.get("/{id}", response_model=InterviewWithQuestions)
@@ -278,6 +339,7 @@ def generate_questions(interview_id: str, payload: GenerateQuestionsRequest):
             description=     payload.description,
             requirements=    payload.requirements,
             count=           payload.count,
+            language=        payload.language,
         )
         return {"questions": questions}
     except Exception as e:
@@ -310,6 +372,7 @@ def enhance_question(interview_id: str, question_id: str, payload: EnhanceQuesti
             interview_type=  payload.interview_type,
             seniority_level= payload.seniority_level,
             question=        payload.question,
+            language=        payload.language,
         )}
     except Exception as e:
         traceback.print_exc()
@@ -340,6 +403,7 @@ def generate_rubric(interview_id: str, question_id: str, payload: GenerateRubric
             interview_type=  payload.interview_type,
             seniority_level= payload.seniority_level,
             title=           payload.title,
+            language=        payload.language,
         )}
     except Exception as e:
         traceback.print_exc()
@@ -372,6 +436,7 @@ def enhance_rubric(interview_id: str, question_id: str, payload: EnhanceRubricRe
             interview_type=  payload.interview_type,
             seniority_level= payload.seniority_level,
             title=           payload.title,
+            language=        payload.language,
         )}
     except Exception as e:
         traceback.print_exc()
@@ -508,14 +573,15 @@ def submit_candidate_video(access_token: str, video: UploadFile = File(...)):
 
     interview_row = (
         supabase.table(INTERVIEWS)
-        .select("id, target_softskills")
+        .select("id, target_softskills, language")
         .eq("id", interview_id)
         .execute()
     )
     if not interview_row.data:
         raise HTTPException(404, "Interview not found")
 
-    interview_targets = interview_row.data[0].get("target_softskills") or []
+    interview_targets  = interview_row.data[0].get("target_softskills") or []
+    interview_language = interview_row.data[0].get("language") or "en"
 
     questions_row = (
         supabase.table(QUESTIONS)
@@ -553,6 +619,7 @@ def submit_candidate_video(access_token: str, video: UploadFile = File(...)):
             video_url=tmp_path,
             questions=questions,
             scoring_weights=None,
+            language=interview_language,
         ))
 
         analysis_payload = _build_candidate_analysis_payload(report)

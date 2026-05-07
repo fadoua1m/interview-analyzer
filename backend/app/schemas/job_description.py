@@ -8,6 +8,7 @@ class JobDescriptionCreate(BaseModel):
     description:     str
     requirements:    str
     seniority_level: str
+    language:        str = "en"
 
     def validate_level(self):
         allowed = {"junior", "mid", "senior", "lead"}
@@ -20,6 +21,7 @@ class JobDescriptionUpdate(BaseModel):
     description:     Optional[str] = None
     requirements:    Optional[str] = None
     seniority_level: Optional[str] = None
+    language:        Optional[str] = None
 
 class JobDescriptionResponse(BaseModel):
     id:              str
@@ -28,5 +30,6 @@ class JobDescriptionResponse(BaseModel):
     description:     str
     requirements:    str
     seniority_level: str
+    language:        str = "en"
     created_at:      datetime
     updated_at:      Optional[datetime] = None

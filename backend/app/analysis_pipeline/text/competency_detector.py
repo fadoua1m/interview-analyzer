@@ -13,12 +13,15 @@ Strength levels:
   not_demonstrated— Target skill was expected but not evidenced (explicit gap)
 """
 
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.config                  import settings
 from app.schemas.analysis        import QAPair, DetectedSkill
 from app.services.mistral_client import generate_json
-from app.services.softskills_bank import get_competency_bank_for_language
+from app.services.softskills_bank import get_competency_bank_for_language, get_display_name_map
+
+logger = logging.getLogger(__name__)
 
 
 # ── Prompt ─────────────────────────────────────────────────────────────────────
@@ -106,12 +109,12 @@ def _build_target_definitions(target_skills: list[str], bank: dict[str, str]) ->
 
 def _allowed_additional_keys(bank: dict[str, str], exclude: set[str]) -> str:
     keys = sorted(k for k in bank if k not in exclude)
-    return ", ".join(keys[:15])   # cap at 15 — a long list inflates the prompt without improving recall
+    return ", ".join(keys[:15])
 
 
 # ── Per-pair worker ────────────────────────────────────────────────────────────
 
-def _detect_one(pair: QAPair, bank: dict[str, str]) -> list[DetectedSkill]:
+def _detect_one(pair: QAPair, bank: dict[str, str], display_names: dict[str, str]) -> list[DetectedSkill]:
     answer = (pair.answer or "").strip()
     if (
         not answer
@@ -139,13 +142,11 @@ def _detect_one(pair: QAPair, bank: dict[str, str]) -> list[DetectedSkill]:
     try:
         result = generate_json(prompt)
     except Exception as e:
-        print(f"[Competency] LLM call failed for Q '{pair.question[:50]}': {e}")
+        logger.error("LLM call failed for Q '%.50s': %s", pair.question, e)
         return []
 
     detected: list[DetectedSkill] = []
 
-    # Target competencies — skip not_demonstrated (no evidence = no entry in the report;
-    # absence is already implied by not appearing in the detected list).
     for item in result.get("target_skills", []):
         if not isinstance(item, dict):
             continue
@@ -158,13 +159,13 @@ def _detect_one(pair: QAPair, bank: dict[str, str]) -> list[DetectedSkill]:
         if strength not in {"strong", "moderate", "weak"}:
             strength = "weak"
         detected.append(DetectedSkill(
-            name=       name,
-            strength=   strength,
-            quote=      str(item.get("quote",     ""))[:300],
-            description=str(item.get("reasoning", ""))[:200],
+            name=        name,
+            display_name=display_names.get(name, ""),
+            strength=    strength,
+            quote=       str(item.get("quote",     ""))[:300],
+            description= str(item.get("reasoning", ""))[:200],
         ))
 
-    # Additional competencies (only demonstrated ones)
     existing = {d.name for d in detected}
     for item in result.get("additional_skills", []):
         if not isinstance(item, dict):
@@ -176,10 +177,11 @@ def _detect_one(pair: QAPair, bank: dict[str, str]) -> list[DetectedSkill]:
         if strength not in {"strong", "moderate", "weak"}:
             strength = "moderate"
         detected.append(DetectedSkill(
-            name=       name,
-            strength=   strength,
-            quote=      str(item.get("quote",     ""))[:300],
-            description=str(item.get("reasoning", ""))[:200],
+            name=        name,
+            display_name=display_names.get(name, ""),
+            strength=    strength,
+            quote=       str(item.get("quote",     ""))[:300],
+            description= str(item.get("reasoning", ""))[:200],
         ))
         existing.add(name)
 
@@ -198,7 +200,6 @@ def _deduplicate(all_skills: list[DetectedSkill], max_skills: int = 10) -> list[
         if not existing:
             by_name[skill.name] = skill
         else:
-            # Prefer higher strength; on tie, prefer longer quote (more evidence)
             if _order.get(skill.strength, 0) > _order.get(existing.strength, 0):
                 by_name[skill.name] = skill
             elif _order.get(skill.strength, 0) == _order.get(existing.strength, 0):
@@ -219,7 +220,7 @@ def run(qa_pairs: list[QAPair], language: str = "en") -> list[DetectedSkill]:
 
     Args:
         qa_pairs: interview Q&A pairs (must have target_skills set)
-        language: "en" or "fr" — selects the right competency bank
+        language: "en" or "fr" — selects the right competency bank and prompt language
 
     Returns:
         Deduplicated list of up to 10 DetectedSkill objects (strongest first).
@@ -227,17 +228,19 @@ def run(qa_pairs: list[QAPair], language: str = "en") -> list[DetectedSkill]:
     if not qa_pairs:
         return []
 
-    bank = get_competency_bank_for_language(language) or {}
+    bank = get_competency_bank_for_language("en") or {}
     if not bank:
-        print(f"[Competency] No competency bank found for language='{language}'")
+        logger.warning("No competency bank found for language='en'")
         return []
+
+    display_names = get_display_name_map("en")
 
     all_detected: list[DetectedSkill] = []
     max_workers = min(len(qa_pairs), settings.text_relevance_max_workers)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(_detect_one, p, bank): i
+            executor.submit(_detect_one, p, bank, display_names): i
             for i, p in enumerate(qa_pairs)
             if p.target_skills
         }
@@ -246,10 +249,10 @@ def run(qa_pairs: list[QAPair], language: str = "en") -> list[DetectedSkill]:
             try:
                 skills = future.result()
                 all_detected.extend(skills)
-                print(f"[Competency] Q{idx+1}: detected {len(skills)} skills")
+                logger.debug("Q%d: detected %d skills", idx + 1, len(skills))
             except Exception as e:
-                print(f"[Competency] Q{idx+1} failed: {e}")
+                logger.error("Q%d failed: %s", idx + 1, e)
 
     final = _deduplicate(all_detected, max_skills=settings.softskills_max_skills)
-    print(f"[Competency] Final: {len(final)} unique skills after deduplication")
+    logger.debug("Final: %d unique skills after deduplication", len(final))
     return final

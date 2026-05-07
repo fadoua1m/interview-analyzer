@@ -12,9 +12,12 @@ Notes:
   - Frames are sampled *during the read loop* to prevent OOM on long videos.
 """
 
+import logging
 import numpy as np
 import cv2
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class VideoAnalysisResult:
@@ -84,9 +87,11 @@ def analyze_video(
     # Effective fps after skipping: frame_index / effective_fps = real timestamp
     effective_fps = fps / frame_skip
 
-    print(f"[VideoAnalyzer] {total_frames} total frames → {len(sampled_frames)} sampled "
-          f"(skip={frame_skip}, src_fps={fps:.1f}, effective_fps={effective_fps:.1f}, "
-          f"duration={duration:.1f}s)")
+    logger.info(
+        "[VideoAnalyzer] %d total frames → %d sampled (skip=%d, src_fps=%.1f, "
+        "effective_fps=%.1f, duration=%.1fs)",
+        total_frames, len(sampled_frames), frame_skip, fps, effective_fps, duration,
+    )
 
     return _run_analysis(
         frames=sampled_frames,

@@ -40,27 +40,27 @@ export function useDeleteJob() {
 
 export function useEnhanceDescription() {
   return useMutation({
-    mutationFn: ({ title, company, description }) =>
+    mutationFn: ({ title, company, description, language = "en" }) =>
       client
-        .post("/api/v1/jobs/ai/enhance-description", { title, company, description })
+        .post("/api/v1/jobs/ai/enhance-description", { title, company, description, language })
         .then((r) => r.data.result),
   });
 }
 
 export function useGenerateRequirements() {
   return useMutation({
-    mutationFn: ({ title, company, description }) =>
+    mutationFn: ({ title, company, description, language = "en" }) =>
       client
-        .post("/api/v1/jobs/ai/generate-requirements", { title, company, description })
+        .post("/api/v1/jobs/ai/generate-requirements", { title, company, description, language })
         .then((r) => r.data.result),
   });
 }
 
 export function useEnhanceRequirements() {
   return useMutation({
-    mutationFn: ({ title, requirements }) =>
+    mutationFn: ({ title, requirements, language = "en" }) =>
       client
-        .post("/api/v1/jobs/ai/enhance-requirements", { title, requirements })
+        .post("/api/v1/jobs/ai/enhance-requirements", { title, requirements, language })
         .then((r) => r.data.result),
   });
 }

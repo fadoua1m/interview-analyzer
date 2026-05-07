@@ -11,11 +11,14 @@ Returns a dict {per_question: list[RelevanceScore], overall_score: float}
 compatible with TextAnalysisResult.
 """
 
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.config                  import settings
 from app.schemas.analysis        import QAPair
 from app.services.mistral_client import generate_json
+
+logger = logging.getLogger(__name__)
 
 
 # ── Prompts ────────────────────────────────────────────────────────────────────
@@ -127,7 +130,7 @@ class RelevanceScore:
         self.directness_score = round(max(0.0, min(10.0, float(directness_score))), 1) if directness_score is not None else None
         self.depth_score      = round(max(0.0, min(10.0, float(depth_score))), 1)      if depth_score      is not None else None
         self.rubric_fit_score = round(max(0.0, min(10.0, float(rubric_fit_score))), 1) if rubric_fit_score is not None else None
-        self.skipped          = skipped  # True when answer was absent/placeholder
+        self.skipped          = skipped
 
 
 # ── Per-pair worker ────────────────────────────────────────────────────────────
@@ -140,21 +143,23 @@ def _is_usable(answer: str) -> bool:
     return len(answer.split()) >= settings.text_min_answer_words
 
 
-def _score_one(pair: QAPair) -> RelevanceScore:
+def _score_one(pair: QAPair, language: str = "en") -> RelevanceScore:
     answer = (pair.answer or "").strip()
     answer_words = len(answer.split()) if answer else 0
     
-    print(f"[Relevance] Processing Q: {pair.question[:50]}... | Answer: {answer[:60]}... | Words: {answer_words}")
+    # ADD THIS DEBUG:
+    print(f"[RELEVANCE DEBUG] Answer first 200 chars: {answer[:200]}")
+    print(f"[RELEVANCE DEBUG] Answer words: {answer_words}")
+    print(f"[RELEVANCE DEBUG] Is None? {answer is None}")
+    print(f"[RELEVANCE DEBUG] Is placeholder? {answer == settings.segment_no_answer_placeholder}")
     
     if not _is_usable(answer):
         if answer == settings.segment_no_answer_placeholder:
-            print(f"[Relevance] SKIPPED: No answer was extracted from the transcript.")
+            print(f"[RELEVANCE DEBUG] Hit: answer equals placeholder")
             return RelevanceScore(score=0.0, reasoning="No answer was extracted from the transcript.", skipped=True)
-        print(f"[Relevance] SKIPPED: answer too short ({answer_words} words, min: {settings.text_min_answer_words})")
+        print(f"[RELEVANCE DEBUG] Hit: answer too short ({answer_words} words, min: {settings.text_min_answer_words})")
         return RelevanceScore(score=0.0, reasoning="Answer too short for reliable scoring.", skipped=True)
-
     rubric = (pair.rubric or "").strip()
-    print(f"[Relevance] ✓ Calling LLM for evaluation...")
 
     try:
         if rubric:
@@ -171,8 +176,6 @@ def _score_one(pair: QAPair) -> RelevanceScore:
                 directness_score=float(data.get("relevance_score", 5.0)),
                 rubric_fit_score=float(data.get("rubric_fit_score",5.0)),
             )
-            print(f"[Relevance] ✓ LLM returned: score={result.score}")
-            return result
         else:
             data = generate_json(
                 _RELEVANCE_PROMPT.format(
@@ -186,16 +189,16 @@ def _score_one(pair: QAPair) -> RelevanceScore:
                 directness_score=float(data.get("directness_score",5.0)),
                 depth_score=     float(data.get("depth_score",     5.0)),
             )
-            print(f"[Relevance] ✓ LLM returned: score={result.score}")
-            return result
+        logger.debug("LLM result: score=%.1f", result.score)
+        return result
     except Exception as e:
-        print(f"[Relevance] ❌ LLM ERROR: {e}")
+        logger.error("LLM error: %s", e)
         return RelevanceScore(score=0.0, reasoning="Scoring error.")
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def run(qa_pairs: list[QAPair]) -> dict:
+def run(qa_pairs: list[QAPair], language: str = "en") -> dict:
     """Score relevance for all QA pairs in parallel.
 
     Returns:
@@ -211,14 +214,14 @@ def run(qa_pairs: list[QAPair]) -> dict:
     max_workers = min(len(qa_pairs), settings.text_relevance_max_workers)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_score_one, p): i for i, p in enumerate(qa_pairs)}
+        futures = {executor.submit(_score_one, p, language): i for i, p in enumerate(qa_pairs)}
         for future in as_completed(futures):
             idx = futures[future]
             try:
                 results[idx] = future.result()
-                print(f"[Relevance] Q{idx+1}: score={results[idx].score}")
+                logger.debug("Q%d: score=%.1f", idx + 1, results[idx].score)
             except Exception as e:
-                print(f"[Relevance] Q{idx+1} failed: {e}")
+                logger.error("Q%d failed: %s", idx + 1, e)
                 results[idx] = RelevanceScore()
 
     filled  = [r if r is not None else RelevanceScore() for r in results]

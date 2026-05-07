@@ -48,6 +48,7 @@ class InterviewResponse(BaseModel):
     title:      str
     notes:      Optional[str]      = None
     target_softskills: List[str]   = Field(default_factory=list)
+    processed_count:   int         = 0
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -67,6 +68,7 @@ class GenerateQuestionsRequest(BaseModel):
     description:     str
     requirements:    str
     count:           int = Field(default=10, ge=1, le=20)
+    language:        str = "en"
 
 class GenerateQuestionsResponse(BaseModel):
     questions: List[str]
@@ -76,6 +78,7 @@ class EnhanceQuestionRequest(BaseModel):
     interview_type:  str
     seniority_level: str
     question:        str
+    language:        str = "en"
 
 class AITextResponse(BaseModel):
     result: str
@@ -85,6 +88,7 @@ class GenerateRubricRequest(BaseModel):
     interview_type:  str
     seniority_level: str
     title:           str
+    language:        str = "en"
 
 class EnhanceRubricRequest(BaseModel):
     question:        str
@@ -92,6 +96,7 @@ class EnhanceRubricRequest(BaseModel):
     interview_type:  str
     seniority_level: str
     title:           str
+    language:        str = "en"
 
 
 class CandidateAssignCreate(BaseModel):

@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Mic, Briefcase, Trash2, ArrowRight,
   Plus, Code2, Users, Layers, Search, X,
-  HelpCircle, Calendar, FileText,
+  HelpCircle, Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -15,22 +15,22 @@ import { useI18n } from "@/lib/i18n";
 
 const TYPE_CONFIG = {
   behavioral: {
-    label: "Behavioral", icon: Users,
+    labelKey: "typeBehavioral", icon: Users,
     bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",
     dot: "bg-blue-400",  strip: "bg-blue-500",
   },
   technical: {
-    label: "Technical", icon: Code2,
+    labelKey: "typeTechnical", icon: Code2,
     bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200",
     dot: "bg-violet-400",strip: "bg-violet-500",
   },
   hr: {
-    label: "HR", icon: Briefcase,
+    labelKey: "typeHr", icon: Briefcase,
     bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200",
     dot: "bg-emerald-400",strip: "bg-emerald-500",
   },
   mixed: {
-    label: "Mixed", icon: Layers,
+    labelKey: "typeMixed", icon: Layers,
     bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",
     dot: "bg-amber-400", strip: "bg-amber-500",
   },
@@ -39,6 +39,7 @@ const TYPE_CONFIG = {
 // ── Single interview card ─────────────────────────────────────────────────────
 function InterviewCard({ interview, onDelete }) {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const cfg  = TYPE_CONFIG[interview.type] ?? TYPE_CONFIG.behavioral;
   const Icon = cfg.icon;
   const qCount = interview.questions?.length ?? 0;
@@ -70,7 +71,7 @@ function InterviewCard({ interview, onDelete }) {
               cfg.bg, cfg.text, cfg.border
             )}>
               <span className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} />
-              {cfg.label}
+              {t(cfg.labelKey)}
             </span>
           </div>
         </div>
@@ -100,7 +101,7 @@ function InterviewCard({ interview, onDelete }) {
         <div className="flex items-center gap-3 text-xs text-slate-400">
           <span className="flex items-center gap-1">
             <HelpCircle className="w-3 h-3" />
-            {qCount} {qCount === 1 ? "question" : "questions"}
+            {qCount} {t(qCount === 1 ? "questionSingular" : "questionPlural")}
           </span>
           <span className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
@@ -188,7 +189,7 @@ export default function InterviewsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search interviews…"
+            placeholder={t("searchInterviews")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-8 h-9 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 transition-colors"
@@ -209,7 +210,7 @@ export default function InterviewsPage() {
               typeFilter === "all" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
             )}
           >
-            All
+            {t("allTypes")}
           </button>
           {Object.entries(TYPE_CONFIG).map(([type, cfg]) => {
             const count = counts[type] || 0;
@@ -226,7 +227,7 @@ export default function InterviewsPage() {
                 )}
               >
                 <span className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} />
-                {cfg.label}
+                {t(cfg.labelKey)}
                 <span className={cn(
                   "text-[10px] font-bold px-1 py-0.5 rounded-full",
                   typeFilter === type ? cn(cfg.bg, cfg.text) : "text-slate-400"
@@ -267,12 +268,12 @@ export default function InterviewsPage() {
             </>
           ) : (
             <>
-              <p className="text-sm font-semibold text-slate-700">No results found</p>
+              <p className="text-sm font-semibold text-slate-700">{t("noResultsFound")}</p>
               <button
                 onClick={() => { setSearch(""); setTypeFilter("all"); }}
                 className="text-xs text-indigo-500 hover:text-indigo-700 mt-2 font-medium transition-colors"
               >
-                Clear filters
+                {t("clearFilters")}
               </button>
             </>
           )}

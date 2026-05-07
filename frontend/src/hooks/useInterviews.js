@@ -16,6 +16,7 @@ function normalizeReportPayload(data = {}) {
       confidence_level:        tm.confidence_level ?? "unknown",
       relevance_score:         Number(tm.relevance_score ?? 0),
       relevance_per_question:  Array.isArray(tm.relevance_per_question) ? tm.relevance_per_question : [],
+      per_question:            Array.isArray(tm.per_question) ? tm.per_question : [],
     },
 
     detected_skills: Array.isArray(data.detected_skills) ? data.detected_skills : [],
@@ -25,15 +26,19 @@ function normalizeReportPayload(data = {}) {
       emotion_distribution: em.emotion_distribution ?? {},
       top_emotions:         em.top_emotions ?? {},
       emotion_timeline:     Array.isArray(em.emotion_timeline) ? em.emotion_timeline : [],
-      volatility:           Number(em.volatility ?? 0),
       positive_ratio:       Number(em.positive_ratio ?? 0),
+      neutral_ratio:        Number(em.neutral_ratio ?? 0),
+      negative_ratio:       Number(em.negative_ratio ?? 0),
+      smile_rate:           Number(em.smile_rate ?? 0),
+      stress_peak_count:    Number(em.stress_peak_count ?? 0),
+      true_volatility:      Number(em.true_volatility ?? 0),
       confidence:           Number(em.confidence ?? 0),
     },
 
     engagement_metrics: {
       engagement_rate:     Number(eng.engagement_rate ?? 0),
-      head_stability:      Number(eng.head_stability ?? 0),
-      gaze_consistency:    Number(eng.gaze_consistency ?? 0),
+      emotion_stability:   Number(eng.emotion_stability ?? 0),
+      detection_quality:   Number(eng.detection_quality ?? 0),
       face_detection_rate: Number(eng.face_detection_rate ?? 0),
       focus_quality:       eng.focus_quality ?? "low",
     },
@@ -43,6 +48,15 @@ function normalizeReportPayload(data = {}) {
     decision_reasons: Array.isArray(data.decision_reasons) ? data.decision_reasons : [],
     hr_summary:       data.hr_summary ?? "",
   };
+}
+
+// ── Dashboard summary ────────────────────────────────────────────────────────
+
+export function useDashboardSummary() {
+  return useQuery({
+    queryKey: ["dashboard-summary"],
+    queryFn:  () => client.get("/api/v1/interviews/dashboard-summary").then((r) => r.data),
+  });
 }
 
 // ── Interviews ───────────────────────────────────────────────────────────────

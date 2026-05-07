@@ -37,6 +37,15 @@ def _run_preprocessing(video_url: str, questions: list):
 
     qa_pairs = segment_transcript(clean_text, questions, transcript_segments=whisper_segments)
 
+    print(f"\n[DEBUG] Number of Q&A pairs: {len(qa_pairs)}")
+    for i, pair in enumerate(qa_pairs):
+        print(f"[DEBUG] Q{i + 1}:")
+        print(f"  Question: {pair.question[:100]}")
+        print(f"  Answer exists: {bool(pair.answer)}")
+        print(f"  Answer length: {len(pair.answer) if pair.answer else 0}")
+        print(f"  Answer preview: {pair.answer[:200] if pair.answer else 'NO ANSWER'}")
+        print(f"  Answer type: {type(pair.answer)}")
+
     raw_frames: list[tuple[float, object]] = f_frames.result() or []
     frames = [frame for _ts, frame in raw_frames]
 
@@ -78,7 +87,7 @@ def run_analysis(request: AnalysisRequest) -> Report:
         # ── Phase 2: Parallel text & video analysis ───────────────────────────
         logger.info("[Pipeline] Starting parallel text & video analysis...")
         with ThreadPoolExecutor(max_workers=2) as executor:
-            f_text  = executor.submit(analyze_text, qa_pairs, None)
+            f_text  = executor.submit(analyze_text, qa_pairs, request.language)
             f_video = executor.submit(analyze_video_frames, frames, video_fps, 1)
         # Both futures are done after the with-block exits.
 
@@ -108,6 +117,7 @@ def run_analysis(request: AnalysisRequest) -> Report:
             qa_pairs=qa_pairs,
             text_result=text_result,
             video_result=video_result,
+            language=request.language,
         )
         logger.info("[Pipeline] Analysis complete.")
         return report

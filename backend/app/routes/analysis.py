@@ -20,14 +20,20 @@ _ALLOWED_VIDEO_EXTS    = {".mp4", ".mov", ".avi", ".webm", ".mkv", ".m4v"}
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _get_interview_targets(interview_id: str) -> list[str]:
+def _get_interview_meta(interview_id: str) -> tuple[list[str], str]:
+    """Return (target_softskills, language) for the interview."""
     row = (
         supabase.table("interviews")
-        .select("target_softskills")
+        .select("target_softskills, language")
         .eq("id", interview_id)
         .execute()
     )
-    return row.data[0].get("target_softskills") or [] if row.data else []
+    if not row.data:
+        return [], "en"
+    return (
+        row.data[0].get("target_softskills") or [],
+        row.data[0].get("language") or "en",
+    )
 
 
 def _load_report(interview_id: str) -> Report:
@@ -112,7 +118,7 @@ def run_analysis_route(payload: AnalysisRequest):
     ).data:
         raise HTTPException(404, "Interview not found")
 
-    targets   = _get_interview_targets(payload.interview_id)
+    targets, language = _get_interview_meta(payload.interview_id)
     questions = [
         QuestionInput(id=q.id, text=q.text, rubric=q.rubric, target_skills=targets)
         for q in payload.questions
@@ -124,6 +130,7 @@ def run_analysis_route(payload: AnalysisRequest):
             video_url=       payload.video_url,
             questions=       questions,
             scoring_weights= payload.scoring_weights,
+            language=        language,
         ))
     except Exception as exc:
         logger.exception("[Analysis] run failed for %s", payload.interview_id)
@@ -155,7 +162,7 @@ def run_analysis_upload(
     if not questions_row.data:
         raise HTTPException(400, "This interview has no questions.")
 
-    targets   = _get_interview_targets(interview_id)
+    targets, language = _get_interview_meta(interview_id)
     questions = [
         QuestionInput(
             id=           row["id"],
@@ -187,6 +194,7 @@ def run_analysis_upload(
             video_url=       tmp_path,
             questions=       questions,
             scoring_weights= None,
+            language=        language,
         ))
     except Exception as exc:
         logger.exception("[Analysis] run-upload failed for %s", interview_id)

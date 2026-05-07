@@ -1,5 +1,5 @@
 // src/pages/interviews/CandidateSubmissionPage.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -9,47 +9,31 @@ import {
   CheckCircle, XCircle,
 } from "lucide-react";
 import {
-  useCandidateAccess, useSubmitCandidateVideo, useTranslateAnalysisReport,
+  useCandidateAccess, useSubmitCandidateVideo,
 } from "../../hooks/useInterviews";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const DECISION_CFG = {
-  PROCEED: { icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200", label: "Proceed" },
-  REVIEW:  { icon: AlertCircle, color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200",   label: "Review"  },
-  REJECT:  { icon: XCircle,     color: "text-rose-600",    bg: "bg-rose-50",    border: "border-rose-200",    label: "Reject"  },
+  PROCEED: { icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200", labelKey: "decisionProceed" },
+  REVIEW:  { icon: AlertCircle, color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200",   labelKey: "decisionReview"  },
+  REJECT:  { icon: XCircle,     color: "text-rose-600",    bg: "bg-rose-50",    border: "border-rose-200",    labelKey: "decisionReject"  },
 };
 
 export default function CandidateSubmissionPage() {
   const { token }       = useParams();
   const { data, isLoading, isError } = useCandidateAccess(token);
   const submitVideo     = useSubmitCandidateVideo(token);
-  const translateReport = useTranslateAnalysisReport();
-  const { t, tv, lang } = useI18n();
+  const { t, tv } = useI18n();
 
-  const [file,              setFile]              = useState(null);
-  const [analysis,          setAnalysis]          = useState(null);
-  const [translatedAnalysis,setTranslatedAnalysis]= useState(null);
-  const [dragOver,          setDragOver]          = useState(false);
+  const [file,     setFile]     = useState(null);
+  const [analysis, setAnalysis] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const canSubmit = useMemo(() => {
     if (!data) return false;
     return ["assigned", "submitted", "failed"].includes(data.status);
   }, [data]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      if (!analysis) { setTranslatedAnalysis(null); return; }
-      if (lang !== "fr") { setTranslatedAnalysis(analysis); return; }
-      try {
-        const translated = await translateReport.mutateAsync({ report: analysis, targetLanguage: "fr" });
-        if (!cancelled) setTranslatedAnalysis(translated);
-      } catch { if (!cancelled) setTranslatedAnalysis(analysis); }
-    };
-    run();
-    return () => { cancelled = true; };
-  }, [analysis, lang, translateReport]);
 
   const onSubmit = async () => {
     if (!file) { toast.error("Please choose a video file first."); return; }
@@ -97,8 +81,7 @@ export default function CandidateSubmissionPage() {
     );
   }
 
-  const analysisView = translatedAnalysis || analysis;
-  const dcfg = analysisView ? (DECISION_CFG[analysisView.decision] ?? DECISION_CFG.REVIEW) : null;
+  const dcfg = analysis ? (DECISION_CFG[analysis.decision] ?? DECISION_CFG.REVIEW) : null;
   const DecisionIcon = dcfg?.icon;
 
   return (
@@ -109,7 +92,7 @@ export default function CandidateSubmissionPage() {
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-600 mb-2">
             <Sparkles className="w-3 h-3" />
-            AI Analyzer — Candidate Portal
+            {t("candidatePortal")}
           </div>
           <h1 className="text-2xl font-bold text-slate-900">{t("interviewSubmission")}</h1>
           <p className="text-sm text-slate-400">
@@ -198,15 +181,15 @@ export default function CandidateSubmissionPage() {
                 <div className="space-y-2">
                   <FileVideo className="w-8 h-8 text-emerald-500 mx-auto" />
                   <p className="text-sm font-semibold text-emerald-700">{file.name}</p>
-                  <p className="text-xs text-slate-400">{(file.size / 1024 / 1024).toFixed(1)} MB · Click to change</p>
+                  <p className="text-xs text-slate-400">{(file.size / 1024 / 1024).toFixed(1)} MB · {t("clickToChange")}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <Upload className="w-8 h-8 text-slate-300 mx-auto" />
                   <p className="text-sm font-medium text-slate-500">
-                    {dragOver ? "Drop your video here" : "Click or drag & drop your video"}
+                    {dragOver ? t("dropHere") : t("clickOrDrop")}
                   </p>
-                  <p className="text-xs text-slate-400">MP4, MOV, WebM accepted</p>
+                  <p className="text-xs text-slate-400">{t("videoFormats")}</p>
                 </div>
               )}
             </div>
@@ -237,32 +220,32 @@ export default function CandidateSubmissionPage() {
             {submitVideo.isPending && (
               <div className="flex items-center justify-center gap-2 text-xs text-indigo-600 animate-pulse">
                 <Sparkles className="w-3.5 h-3.5" />
-                AI is analyzing your video — this may take a few minutes…
+                {t("analyzingVideo")}
               </div>
             )}
           </div>
         </div>
 
         {/* ── Analysis result ──────────────────────────────────────────── */}
-        {analysisView && dcfg && (
+        {analysis && dcfg && (
           <div className={cn("rounded-2xl border overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.04)]", dcfg.border)}>
             <div className={cn("flex items-center gap-3 px-5 py-4 border-b", dcfg.bg, dcfg.border)}>
               <DecisionIcon className={cn("w-5 h-5 shrink-0", dcfg.color)} />
               <div>
                 <p className="text-xs font-semibold text-slate-500">{t("processedResult")}</p>
-                <p className={cn("text-sm font-bold", dcfg.color)}>{dcfg.label}</p>
+                <p className={cn("text-sm font-bold", dcfg.color)}>{t(dcfg.labelKey)}</p>
               </div>
               <div className="ml-auto text-right">
                 <p className="text-xs text-slate-400">{t("overallScore")}</p>
                 <p className="text-2xl font-bold text-slate-900 tabular-nums leading-none">
-                  {analysisView.overall_score ?? 0}
+                  {analysis.overall_score ?? 0}
                   <span className="text-sm font-medium text-slate-400">/100</span>
                 </p>
               </div>
             </div>
             <div className="bg-white px-5 py-4">
               <p className="text-sm text-slate-700 leading-relaxed">
-                {analysisView.hr_summary || t("processedDone")}
+                {analysis.hr_summary || t("processedDone")}
               </p>
             </div>
           </div>

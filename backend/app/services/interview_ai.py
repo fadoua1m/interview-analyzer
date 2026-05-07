@@ -25,6 +25,7 @@ def generate_questions(
     description: str,
     requirements: str,
     count: int = 10,
+    language: str = "en",
 ) -> list[str]:
     type_context     = _TYPE_CONTEXT.get(interview_type, "general interview questions.")
     seniority_depth  = _SENIORITY_DEPTH.get(seniority_level, "")
@@ -45,6 +46,7 @@ Rules:
 - Direct and specific — no preamble, no sub-questions
 - Numbered list: 1. 2. 3. ...
 - Plain text only
+- Output language: {language}
 
 Return only the numbered list."""
 
@@ -56,6 +58,7 @@ def enhance_question(
     interview_type: str,
     seniority_level: str,
     question: str,
+    language: str = "en",
 ) -> str:
     prompt = f"""Rewrite this interview question for a {seniority_level} {title} ({interview_type} interview).
 
@@ -65,6 +68,7 @@ Rules:
 - One sentence, max 20 words
 - Direct, specific, open-ended
 - No preamble
+- Output language: {language}
 
 Return only the rewritten question."""
 
@@ -97,6 +101,7 @@ def generate_rubric(
     interview_type:  str,
     seniority_level: str,
     title:           str,
+    language:        str = "en",
 ) -> str:
     prompt = f"""You are an expert HR evaluator. Create a scoring rubric for this interview question.
 
@@ -108,6 +113,7 @@ Rules:
 - Each band is one sentence describing what that answer looks like
 - Be specific to the question — no generic language
 - Plain text only, no JSON, no markdown
+- Output language: {language}
 
 Format exactly like this:
 0-2: <what a poor answer looks like>
@@ -125,6 +131,7 @@ def enhance_rubric(
     interview_type:  str,
     seniority_level: str,
     title:           str,
+    language:        str = "en",
 ) -> str:
     prompt = f"""You are an expert HR evaluator. Improve this scoring rubric for the interview question.
 
@@ -139,6 +146,7 @@ Rules:
 - Make each band more specific and actionable
 - Ensure bands clearly differentiate answer quality
 - Plain text only
+- Output language: {language}
 
 Return only the 4 lines in the same format."""
     return generate(prompt).strip()

@@ -3,25 +3,26 @@ import { useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import {
   LayoutDashboard, Briefcase, Mic, Brain,
-  FileText, Users, ChevronRight,
+  FileText, ChevronRight,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 const ROUTES = [
-  { pattern: /^\/$/, icon: LayoutDashboard, label: "Dashboard", section: null },
-  { pattern: /^\/jobs/, icon: Briefcase, label: "Jobs", section: "Recruitment" },
-  { pattern: /^\/interviews\/[^/]+\/candidates\/[^/]+\/report/, icon: FileText, label: "Candidate Report", section: "Interviews" },
-  { pattern: /^\/interviews\/(?!new)[^/]+/, icon: Mic, label: "Interview Detail", section: "Interviews" },
-  { pattern: /^\/interviews/, icon: Mic, label: "Interviews", section: "Recruitment" },
-  { pattern: /^\/softskills/, icon: Brain, label: "Soft Skills Bank", section: "Settings" },
+  { pattern: /^\/$/, icon: LayoutDashboard, labelKey: "pageDashboard", sectionKey: null },
+  { pattern: /^\/jobs/, icon: Briefcase, labelKey: "pageJobs", sectionKey: "sectionRecruitment" },
+  { pattern: /^\/interviews\/[^/]+\/candidates\/[^/]+\/report/, icon: FileText, labelKey: "pageCandidateReport", sectionKey: "sectionInterviews" },
+  { pattern: /^\/interviews\/(?!new)[^/]+/, icon: Mic, labelKey: "pageInterviewDetail", sectionKey: "sectionInterviews" },
+  { pattern: /^\/interviews/, icon: Mic, labelKey: "pageInterviews", sectionKey: "sectionRecruitment" },
+  { pattern: /^\/softskills/, icon: Brain, labelKey: "pageSoftSkillsBank", sectionKey: "sectionSettings" },
 ];
 
 function TopBar() {
   const { pathname } = useLocation();
-  const match = ROUTES.find((r) => r.pattern.test(pathname));
-  const Icon  = match?.icon ?? LayoutDashboard;
-  const label = match?.label ?? "";
-  const section = match?.section;
+  const { t } = useI18n();
+  const match   = ROUTES.find((r) => r.pattern.test(pathname));
+  const Icon    = match?.icon ?? LayoutDashboard;
+  const label   = match ? t(match.labelKey) : "";
+  const section = match?.sectionKey ? t(match.sectionKey) : null;
 
   return (
     <header className="h-13 flex items-center px-6 bg-white border-b border-slate-100 shrink-0 gap-2">
